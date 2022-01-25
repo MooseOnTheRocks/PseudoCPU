@@ -32,17 +32,15 @@ namespace PseudoCPU {
             // Operand usage is defined by the opcode.
             // Operand address is loaded into MAR after the fetch and decode cycle.
             //
-            // Notation:
-            // ```
-            // OPCODE x:
-            // Register Transactions
-            // ```
-            // Example:
-            // ```
-            // ADD x:
-            // MDR <- M[MAR]
-            // AC <- AC + MDR
-            // ```
+            // == PseudoCPU Instructions
+            // LDA x: MDR <- M[MAR], AC <- MDR
+            // STA x: MDR <- AC, M[MAR] <- MDR
+            // ADD x: MDR <- M[MAR], AC <- AC + MDR
+            // SUB x: MDR <- M[MAR], AC <- AC - MDR
+            // NAND x: MDR <- M[MAR], AC <- ~(AC & MDR)
+            // SHFT x: AC <- AC << 1
+            // J x: PC <- MDR(address)
+            // BNE x: if (z != 1) then PC <- MAR(address)
 
             const [ IR, PC, AC, MAR, MDR, ALU, M ] = [ this._ir, this._pc, this._ac, this._mar, this._mdr, this._alu, this._memory ];
 
@@ -62,6 +60,17 @@ namespace PseudoCPU {
                     M.load();       // MDR <- M[MAR]
                     ALU.add();      // AC <- AC + MDR
                     break;
+                case OpCode.SUB:    // SUB x:
+                    M.load();       // MDR <- M[MAR]
+                    ALU.sub();      // AC <- AC - MDR
+                    break;
+                case OpCode.NAND:   // NAND x:
+                    M.load();       // MDR <- M[MAR]
+                    ALU.nand();     // AC <- ~(AC & MDR)
+                    break;
+                case OpCode.SHFT:   // SHFT:
+                    ALU.shft();     // AC <- AC << 1
+                    break;
                 case OpCode.J:      // J x:
                                     // PC <- MDR(address)
                     let ADDRESS_MASK = (1 << ADDRESS_SIZE) - 1;
@@ -69,7 +78,7 @@ namespace PseudoCPU {
                     PC.write(address);
                     break;
                 case OpCode.BNE:    // BNE x:
-                                    // if (Z != 1) then PC <- MAR(address)
+                                    // if (Z != 1) then PC <- MDR(address)
                     if (ALU.Z != 1) {
                         let ADDRESS_MASK = (1 << ADDRESS_SIZE) - 1;
                         let address = MDR.read() & ADDRESS_MASK;

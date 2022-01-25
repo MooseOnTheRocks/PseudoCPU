@@ -134,9 +134,28 @@ var PseudoCPU;
             this._z.write(value);
         }
         add() {
-            let sum = this._ac.read() + this._mdr.read();
+            let WORD_MASK = (1 << PseudoCPU.WORD_SIZE) - 1;
+            let sum = (this._ac.read() + this._mdr.read()) & WORD_MASK;
             this._ac.write(sum);
-            this.Z = sum == 0 ? 1 : 0;
+            this.Z = sum === 0 ? 1 : 0;
+        }
+        sub() {
+            let WORD_MASK = (1 << PseudoCPU.WORD_SIZE) - 1;
+            let difference = (this._ac.read() - this._mdr.read()) & WORD_MASK;
+            this._ac.write(difference);
+            this.Z = difference === 0 ? 1 : 0;
+        }
+        nand() {
+            let WORD_MASK = (1 << PseudoCPU.WORD_SIZE) - 1;
+            let result = ~(this._ac.read() & this._mdr.read()) & WORD_MASK;
+            this._ac.write(result);
+            this.Z = result === 0 ? 1 : 0;
+        }
+        shft() {
+            let WORD_MASK = (1 << PseudoCPU.WORD_SIZE) - 1;
+            let result = (this._ac.read() << 1) & WORD_MASK;
+            this._ac.write(result);
+            this.Z = result === 0 ? 1 : 0;
         }
     }
     PseudoCPU.ArithmeticLogicUnit = ArithmeticLogicUnit;
@@ -147,6 +166,9 @@ var PseudoCPU;
     // LDA x: MDR <- M[MAR], AC <- MDR
     // STA x: MDR <- AC, M[MAR] <- MDR
     // ADD x: MDR <- M[MAR], AC <- AC + MDR
+    // SUB x: MDR <- M[MAR], AC <- AC - MDR
+    // NAND x: MDR <- M[MAR], AC <- ~(AC & MDR)
+    // SHFT x: AC <- AC << 1
     // J x: PC <- MDR(address)
     // BNE x: if (z != 1) then PC <- MAR(address)
     let OpCode;
@@ -154,8 +176,11 @@ var PseudoCPU;
         OpCode[OpCode["LDA"] = 0] = "LDA";
         OpCode[OpCode["STA"] = 1] = "STA";
         OpCode[OpCode["ADD"] = 2] = "ADD";
-        OpCode[OpCode["J"] = 3] = "J";
-        OpCode[OpCode["BNE"] = 4] = "BNE";
+        OpCode[OpCode["SUB"] = 3] = "SUB";
+        OpCode[OpCode["NAND"] = 4] = "NAND";
+        OpCode[OpCode["SHFT"] = 5] = "SHFT";
+        OpCode[OpCode["J"] = 6] = "J";
+        OpCode[OpCode["BNE"] = 7] = "BNE";
     })(OpCode = PseudoCPU.OpCode || (PseudoCPU.OpCode = {}));
     class Instruction {
         constructor(opcode, operand) {
@@ -163,14 +188,18 @@ var PseudoCPU;
             this.operand = operand;
         }
         get value() {
-            return (this.opcode << (PseudoCPU.WORD_SIZE - PseudoCPU.OPERAND_SIZE)) + this.operand;
+            return (this.opcode << PseudoCPU.OPERAND_SIZE) + this.operand;
         }
     }
     PseudoCPU.Instruction = Instruction;
     PseudoCPU.LDA = (operand) => new Instruction(OpCode.LDA, operand);
     PseudoCPU.STA = (operand) => new Instruction(OpCode.STA, operand);
     PseudoCPU.ADD = (operand) => new Instruction(OpCode.ADD, operand);
+    PseudoCPU.SUB = (operand) => new Instruction(OpCode.SUB, operand);
+    PseudoCPU.NAND = (operand) => new Instruction(OpCode.NAND, operand);
+    PseudoCPU.SHFT = () => new Instruction(OpCode.SHFT, 0);
     PseudoCPU.J = (operand) => new Instruction(OpCode.J, operand);
+    PseudoCPU.BNE = (operand) => new Instruction(OpCode.BNE, operand);
 })(PseudoCPU || (PseudoCPU = {}));
 var PseudoCPU;
 (function (PseudoCPU) {
@@ -197,17 +226,15 @@ var PseudoCPU;
             // Operand usage is defined by the opcode.
             // Operand address is loaded into MAR after the fetch and decode cycle.
             //
-            // Notation:
-            // ```
-            // OPCODE x:
-            // Register Transactions
-            // ```
-            // Example:
-            // ```
-            // ADD x:
-            // MDR <- M[MAR]
-            // AC <- AC + MDR
-            // ```
+            // == PseudoCPU Instructions
+            // LDA x: MDR <- M[MAR], AC <- MDR
+            // STA x: MDR <- AC, M[MAR] <- MDR
+            // ADD x: MDR <- M[MAR], AC <- AC + MDR
+            // SUB x: MDR <- M[MAR], AC <- AC - MDR
+            // NAND x: MDR <- M[MAR], AC <- ~(AC & MDR)
+            // SHFT x: AC <- AC << 1
+            // J x: PC <- MDR(address)
+            // BNE x: if (z != 1) then PC <- MAR(address)
             const [IR, PC, AC, MAR, MDR, ALU, M] = [this._ir, this._pc, this._ac, this._mar, this._mdr, this._alu, this._memory];
             const copy = (dst, src) => dst.write(src.read());
             let opcode = IR.read();
@@ -224,6 +251,17 @@ var PseudoCPU;
                     M.load(); // MDR <- M[MAR]
                     ALU.add(); // AC <- AC + MDR
                     break;
+                case PseudoCPU.OpCode.SUB: // SUB x:
+                    M.load(); // MDR <- M[MAR]
+                    ALU.sub(); // AC <- AC - MDR
+                    break;
+                case PseudoCPU.OpCode.NAND: // NAND x:
+                    M.load(); // MDR <- M[MAR]
+                    ALU.nand(); // AC <- ~(AC & MDR)
+                    break;
+                case PseudoCPU.OpCode.SHFT: // SHFT:
+                    ALU.shft(); // AC <- AC << 1
+                    break;
                 case PseudoCPU.OpCode.J: // J x:
                     // PC <- MDR(address)
                     let ADDRESS_MASK = (1 << PseudoCPU.ADDRESS_SIZE) - 1;
@@ -231,7 +269,7 @@ var PseudoCPU;
                     PC.write(address);
                     break;
                 case PseudoCPU.OpCode.BNE: // BNE x:
-                    // if (Z != 1) then PC <- MAR(address)
+                    // if (Z != 1) then PC <- MDR(address)
                     if (ALU.Z != 1) {
                         let ADDRESS_MASK = (1 << PseudoCPU.ADDRESS_SIZE) - 1;
                         let address = MDR.read() & ADDRESS_MASK;
@@ -262,11 +300,44 @@ var PseudoCPU;
     }
     PseudoCPU.ControlUnit = ControlUnit;
 })(PseudoCPU || (PseudoCPU = {}));
+// == PseudoISA
+// -- Data Transfer Instructions
+//      [Load Accumulator]
+//          LDA x; x is a memory location
+//          Loads a memory word to the AC.
+//      [Store Accumulator]
+//          STA x; x is a memory location
+//          Stores the content of the AC to memory.
+// -- Arithmetic and Logical Instructions
+//      [Add to Accumulator]
+//          ADD x; x points to a memory location.
+//          Adds the content of the memory word specified by
+//          the effective address to the content in the AC.
+//      [Subtract from Accumulator]
+//          SUB x; x points to a memory location.
+//          Subtracts the content of the memory word specified
+//          by the effective address from the content in the AC.
+//      [Logical NAND with Accumulator]
+//          NAND x; x points to a memory location.
+//          Performs logical NAND between the contents of the memory
+//          word specified by the effective address and the AC.
+//      [Shift]
+//          SHFT
+//          The content of AC is shifted left by one bit.
+//          The bit shifted in is 0.
+// -- Control Transfer
+//      [Jump]
+//          J x; Jump to instruction in memory location x.
+//      [BNE]
+//          BNE x; Jump to instruction in memory location x if content of AC is not zero
+//          Transfers the program control to the instruction
+//          specified by the target address if Z != 0.
+// 
 // == PseudoCPU Micro-operations
 // -- Store/Load memory
 //      M[MAR] <- MDR
 //      MDR <- M[MAR]
-// -- Store register
+// -- Copy register
 //      Ra <- Rb
 // -- Register increment/decrement
 //      Ra <- Ra + 1
@@ -288,6 +359,9 @@ var PseudoCPU;
 // AC <- AC - 1
 // AC <- AC - RA
 //
+// [Control Unit]
+// Executes instructions and sequences microoperations.
+//
 // [MDR Register]
 // Transfer to/from memory via Data Line.
 //
@@ -296,6 +370,9 @@ var PseudoCPU;
 //
 // [PC Register]
 // Increment via PC <- PC + 1
+//
+// [IR Register]
+// Holds the opcode of the current instruction.
 //
 // [AC Register]
 // Increment via AC <- AC + 1 or AC <- AC + Ra
@@ -314,11 +391,44 @@ var PseudoCPU;
 /// <reference path="./pseudocpu/Instruction.ts"/>
 /// <reference path="./pseudocpu/ControlUnit.ts"/>
 var PseudoCPU;
+// == PseudoISA
+// -- Data Transfer Instructions
+//      [Load Accumulator]
+//          LDA x; x is a memory location
+//          Loads a memory word to the AC.
+//      [Store Accumulator]
+//          STA x; x is a memory location
+//          Stores the content of the AC to memory.
+// -- Arithmetic and Logical Instructions
+//      [Add to Accumulator]
+//          ADD x; x points to a memory location.
+//          Adds the content of the memory word specified by
+//          the effective address to the content in the AC.
+//      [Subtract from Accumulator]
+//          SUB x; x points to a memory location.
+//          Subtracts the content of the memory word specified
+//          by the effective address from the content in the AC.
+//      [Logical NAND with Accumulator]
+//          NAND x; x points to a memory location.
+//          Performs logical NAND between the contents of the memory
+//          word specified by the effective address and the AC.
+//      [Shift]
+//          SHFT
+//          The content of AC is shifted left by one bit.
+//          The bit shifted in is 0.
+// -- Control Transfer
+//      [Jump]
+//          J x; Jump to instruction in memory location x.
+//      [BNE]
+//          BNE x; Jump to instruction in memory location x if content of AC is not zero
+//          Transfers the program control to the instruction
+//          specified by the target address if Z != 0.
+// 
 // == PseudoCPU Micro-operations
 // -- Store/Load memory
 //      M[MAR] <- MDR
 //      MDR <- M[MAR]
-// -- Store register
+// -- Copy register
 //      Ra <- Rb
 // -- Register increment/decrement
 //      Ra <- Ra + 1
@@ -340,6 +450,9 @@ var PseudoCPU;
 // AC <- AC - 1
 // AC <- AC - RA
 //
+// [Control Unit]
+// Executes instructions and sequences microoperations.
+//
 // [MDR Register]
 // Transfer to/from memory via Data Line.
 //
@@ -348,6 +461,9 @@ var PseudoCPU;
 //
 // [PC Register]
 // Increment via PC <- PC + 1
+//
+// [IR Register]
+// Holds the opcode of the current instruction.
 //
 // [AC Register]
 // Increment via AC <- AC + 1 or AC <- AC + Ra
@@ -366,12 +482,12 @@ var PseudoCPU;
 /// <reference path="./pseudocpu/Instruction.ts"/>
 /// <reference path="./pseudocpu/ControlUnit.ts"/>
 (function (PseudoCPU) {
-    PseudoCPU.WORD_SIZE = 16; // word size in bits..
-    PseudoCPU.ADDRESS_SIZE = 8; // address size in bits.
-    PseudoCPU.OPCODE_SIZE = 8; // opcode size in bits.
-    PseudoCPU.OPERAND_SIZE = 8; // operand size in bits.
-    PseudoCPU.PROGRAM_MEMORY_SIZE = 16; // addressable words of program memory.
-    PseudoCPU.DATA_MEMORY_SIZE = 8; // addressable words of data memory.
+    PseudoCPU.WORD_SIZE = 16; // word size in bits.
+    PseudoCPU.ADDRESS_SIZE = 13; // address size in bits; 2**13 = 0x2000 = 8192 addressable words memory.
+    PseudoCPU.OPCODE_SIZE = 3; // opcode size in bits, 2**3 = 8 unique opcodes.
+    PseudoCPU.OPERAND_SIZE = PseudoCPU.ADDRESS_SIZE; // operand size in bits.
+    PseudoCPU.PROGRAM_MEMORY_SIZE = 0x08; // addressable words of program memory.
+    PseudoCPU.DATA_MEMORY_SIZE = 0x08; // addressable words of data memory.
     function main() {
         const PC = new PseudoCPU.Register("PC", PseudoCPU.ADDRESS_SIZE);
         const IR = new PseudoCPU.Register("IR", PseudoCPU.OPCODE_SIZE);
@@ -384,33 +500,28 @@ var PseudoCPU;
         const M = new PseudoCPU.MemoryMap(MDR, MAR);
         const CU = new PseudoCPU.ControlUnit(IR, PC, AC, MAR, MDR, ALU, M);
         const DATA_BEGIN = 0x0000;
-        const PROG_BEGIN = 0x0100;
+        const PROG_BEGIN = DATA.SIZE;
         M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, PseudoCPU.MemoryAccess.READ_WRITE, DATA);
         M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, PseudoCPU.MemoryAccess.READ, PROG);
         // Place PC on first program instruction.
         PC.write(PROG_BEGIN);
-        // Program to compute the first 6 fibonacci numbers.
+        // Program to compute the code C = 4*A + B.
+        let A = 0;
+        let B = 1;
+        let C = 2;
         const program = [
-            PseudoCPU.LDA(0x00),
-            PseudoCPU.ADD(0x00),
-            PseudoCPU.STA(0x01),
-            PseudoCPU.ADD(0x00),
-            PseudoCPU.STA(0x02),
-            PseudoCPU.ADD(0x01),
-            PseudoCPU.STA(0x03),
-            PseudoCPU.ADD(0x02),
-            PseudoCPU.STA(0x04),
-            PseudoCPU.ADD(0x03),
-            PseudoCPU.STA(0x05),
-            PseudoCPU.LDA(0x07),
-            PseudoCPU.ADD(0x07), // 0 + 0 = 0, Z flag on ALU should be set
+            PseudoCPU.LDA(A),
+            PseudoCPU.SHFT(),
+            PseudoCPU.SHFT(),
+            PseudoCPU.ADD(B),
+            PseudoCPU.STA(C)
         ];
         // Write the program into memory.
         program.forEach((instruction, address) => {
             PROG.write(address, instruction.value);
         });
-        // Place initial fibonacci number (1) in data.
-        DATA.write(0x00, 0x0001); // M[0x00] = 0x0001
+        DATA.write(A, 80);
+        DATA.write(B, 20); // M[0x00] = 0x0001
         function printState() {
             const print = (...args) => console.log(...args.map(value => value.toString()));
             print("==========");

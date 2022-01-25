@@ -19,9 +19,31 @@ namespace PseudoCPU {
         }
 
         public add() {
-            let sum = this._ac.read() + this._mdr.read();
+            let WORD_MASK = (1 << WORD_SIZE) - 1;
+            let sum = (this._ac.read() + this._mdr.read()) & WORD_MASK;
             this._ac.write(sum);
-            this.Z = sum == 0 ? 1 : 0;
+            this.Z = sum === 0 ? 1 : 0;
+        }
+
+        public sub() {
+            let WORD_MASK = (1 << WORD_SIZE) - 1;
+            let difference = (this._ac.read() - this._mdr.read()) & WORD_MASK;
+            this._ac.write(difference);
+            this.Z = difference === 0 ? 1 : 0;
+        }
+
+        public nand() {
+            let WORD_MASK = (1 << WORD_SIZE) - 1;
+            let result = ~(this._ac.read() & this._mdr.read()) & WORD_MASK;
+            this._ac.write(result);
+            this.Z = result === 0 ? 1 : 0;
+        }
+
+        public shft() {
+            let WORD_MASK = (1 << WORD_SIZE) - 1;
+            let result = (this._ac.read() << 1) & WORD_MASK;
+            this._ac.write(result);
+            this.Z = result === 0 ? 1 : 0;
         }
     }
 }

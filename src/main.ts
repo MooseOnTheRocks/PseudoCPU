@@ -1,9 +1,42 @@
 
+// == PseudoISA
+// -- Data Transfer Instructions
+//      [Load Accumulator]
+//          LDA x; x is a memory location
+//          Loads a memory word to the AC.
+//      [Store Accumulator]
+//          STA x; x is a memory location
+//          Stores the content of the AC to memory.
+// -- Arithmetic and Logical Instructions
+//      [Add to Accumulator]
+//          ADD x; x points to a memory location.
+//          Adds the content of the memory word specified by
+//          the effective address to the content in the AC.
+//      [Subtract from Accumulator]
+//          SUB x; x points to a memory location.
+//          Subtracts the content of the memory word specified
+//          by the effective address from the content in the AC.
+//      [Logical NAND with Accumulator]
+//          NAND x; x points to a memory location.
+//          Performs logical NAND between the contents of the memory
+//          word specified by the effective address and the AC.
+//      [Shift]
+//          SHFT
+//          The content of AC is shifted left by one bit.
+//          The bit shifted in is 0.
+// -- Control Transfer
+//      [Jump]
+//          J x; Jump to instruction in memory location x.
+//      [BNE]
+//          BNE x; Jump to instruction in memory location x if content of AC is not zero
+//          Transfers the program control to the instruction
+//          specified by the target address if Z != 0.
+// 
 // == PseudoCPU Micro-operations
 // -- Store/Load memory
 //      M[MAR] <- MDR
 //      MDR <- M[MAR]
-// -- Store register
+// -- Copy register
 //      Ra <- Rb
 // -- Register increment/decrement
 //      Ra <- Ra + 1
@@ -25,6 +58,9 @@
 // AC <- AC - 1
 // AC <- AC - RA
 //
+// [Control Unit]
+// Executes instructions and sequences microoperations.
+//
 // [MDR Register]
 // Transfer to/from memory via Data Line.
 //
@@ -33,6 +69,9 @@
 //
 // [PC Register]
 // Increment via PC <- PC + 1
+//
+// [IR Register]
+// Holds the opcode of the current instruction.
 //
 // [AC Register]
 // Increment via AC <- AC + 1 or AC <- AC + Ra
@@ -53,12 +92,13 @@
 /// <reference path="./pseudocpu/ControlUnit.ts"/>
 
 namespace PseudoCPU {
-    export const WORD_SIZE = 16; // word size in bits..
-    export const ADDRESS_SIZE = 8; // address size in bits.
-    export const OPCODE_SIZE = 8; // opcode size in bits.
-    export const OPERAND_SIZE = 8; // operand size in bits.
-    export const PROGRAM_MEMORY_SIZE = 16; // addressable words of program memory.
-    export const DATA_MEMORY_SIZE = 8; // addressable words of data memory.
+    export const WORD_SIZE = 16; // word size in bits.
+    export const ADDRESS_SIZE = 13; // address size in bits; 2**13 = 0x2000 = 8192 addressable words memory.
+    export const OPCODE_SIZE = 3; // opcode size in bits, 2**3 = 8 unique opcodes.
+    export const OPERAND_SIZE = ADDRESS_SIZE; // operand size in bits.
+
+    export const PROGRAM_MEMORY_SIZE = 0x08; // addressable words of program memory.
+    export const DATA_MEMORY_SIZE = 0x08; // addressable words of data memory.
 
     export function main() {
         const PC = new Register("PC", ADDRESS_SIZE);
@@ -73,35 +113,31 @@ namespace PseudoCPU {
         const CU = new ControlUnit(IR, PC, AC, MAR, MDR, ALU, M);
 
         const DATA_BEGIN = 0x0000;
-        const PROG_BEGIN = 0x0100;
+        const PROG_BEGIN = DATA.SIZE;
         M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, MemoryAccess.READ_WRITE, DATA);
         M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, MemoryAccess.READ, PROG);
         // Place PC on first program instruction.
         PC.write(PROG_BEGIN);
 
-        // Program to compute the first 6 fibonacci numbers.
+        // Program to compute the code C = 4*A + B.
+        let A = 0;
+        let B = 1;
+        let C = 2;
         const program: Array<Instruction> = [
-            LDA(0x00),  // Load initial number from memory (1)
-            ADD(0x00),  // Add with itself (1 + 1 = 2)
-            STA(0x01),  // Store in memory
-            ADD(0x00),  // Add with previous number (2 + 1 = 3)
-            STA(0x02),  // Store in memory
-            ADD(0x01),  // Repeat...
-            STA(0x03),
-            ADD(0x02),
-            STA(0x04),
-            ADD(0x03),
-            STA(0x05),
-            LDA(0x07),  // Load 0 into MDR and AC
-            ADD(0x07),  // 0 + 0 = 0, Z flag on ALU should be set
+            LDA(A),
+            SHFT(),
+            SHFT(),
+            ADD(B),
+            STA(C)
         ];
+
         // Write the program into memory.
         program.forEach((instruction, address) => {
             PROG.write(address, instruction.value);
         });
 
-        // Place initial fibonacci number (1) in data.
-        DATA.write(0x00, 0x0001);    // M[0x00] = 0x0001
+        DATA.write(A, 80);
+        DATA.write(B, 20);    // M[0x00] = 0x0001
 
         function printState() {
             const print = (...args: Array<{toString(): String}>) => console.log(...args.map(value => value.toString()));
