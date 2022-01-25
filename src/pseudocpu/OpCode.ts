@@ -13,15 +13,4 @@ namespace PseudoCPU {
         J,
         BNE
     }
-
-    export function opname(opcode: OpCode) {
-        switch (opcode) {
-            case OpCode.LDA:    return "LDA";
-            case OpCode.STA:    return "STA";
-            case OpCode.ADD:    return "ADD";
-            case OpCode.J:      return "J";
-            case OpCode.BNE:    return "BNE";
-            default:            return "UNKNOWN";
-        }
-    }
 }

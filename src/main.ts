@@ -86,7 +86,7 @@ namespace PseudoCPU {
             print("==========");
             print("== Registers");
             print(PC);
-            print(IR, "=>", opname(IR.read()));
+            print(IR, "=>", OpCode[IR.read()]);
             print(AC);
             print(MDR);
             print(MAR);

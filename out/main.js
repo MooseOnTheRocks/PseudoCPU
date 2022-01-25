@@ -98,17 +98,6 @@ var PseudoCPU;
         OpCode[OpCode["J"] = 3] = "J";
         OpCode[OpCode["BNE"] = 4] = "BNE";
     })(OpCode = PseudoCPU.OpCode || (PseudoCPU.OpCode = {}));
-    function opname(opcode) {
-        switch (opcode) {
-            case OpCode.LDA: return "LDA";
-            case OpCode.STA: return "STA";
-            case OpCode.ADD: return "ADD";
-            case OpCode.J: return "J";
-            case OpCode.BNE: return "BNE";
-            default: return "UNKNOWN";
-        }
-    }
-    PseudoCPU.opname = opname;
 })(PseudoCPU || (PseudoCPU = {}));
 var PseudoCPU;
 (function (PseudoCPU) {
@@ -328,7 +317,7 @@ var PseudoCPU;
             print("==========");
             print("== Registers");
             print(PC);
-            print(IR, "=>", PseudoCPU.opname(IR.read()));
+            print(IR, "=>", PseudoCPU.OpCode[IR.read()]);
             print(AC);
             print(MDR);
             print(MAR);
