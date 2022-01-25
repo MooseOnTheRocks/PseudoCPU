@@ -92,7 +92,7 @@
 /// <reference path="./pseudocpu/ArithmeticLogicUnit.ts"/>
 /// <reference path="./pseudocpu/Instruction.ts"/>
 /// <reference path="./pseudocpu/ControlUnit.ts"/>
-/// <reference path="./pseudocpu/CentralProcessingUnit.ts"/>
+/// <reference path="./pseudocpu/ECE375PseudoCPU.ts"/>
 
 namespace PseudoCPU {
     export const WORD_SIZE = 16; // word size in bits.

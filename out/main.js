@@ -422,7 +422,7 @@ var PseudoCPU;
 /// <reference path="./pseudocpu/ArithmeticLogicUnit.ts"/>
 /// <reference path="./pseudocpu/Instruction.ts"/>
 /// <reference path="./pseudocpu/ControlUnit.ts"/>
-/// <reference path="./pseudocpu/CentralProcessingUnit.ts"/>
+/// <reference path="./pseudocpu/ECE375PseudoCPU.ts"/>
 var PseudoCPU;
 // == PseudoISA
 // -- Data Transfer Instructions
@@ -516,7 +516,7 @@ var PseudoCPU;
 /// <reference path="./pseudocpu/ArithmeticLogicUnit.ts"/>
 /// <reference path="./pseudocpu/Instruction.ts"/>
 /// <reference path="./pseudocpu/ControlUnit.ts"/>
-/// <reference path="./pseudocpu/CentralProcessingUnit.ts"/>
+/// <reference path="./pseudocpu/ECE375PseudoCPU.ts"/>
 (function (PseudoCPU) {
     PseudoCPU.WORD_SIZE = 16; // word size in bits.
     PseudoCPU.ADDRESS_SIZE = 13; // address size in bits; 2**13 = 0x2000 = 8192 addressable words memory.
