@@ -198,7 +198,7 @@ var PseudoCPU;
             // ```
             const [IR, PC, AC, MAR, MDR, ALU, M] = [this._ir, this._pc, this._ac, this._mar, this._mdr, this._alu, this._memory];
             const copy = (dst, src) => dst.write(src.read());
-            let opcode = this._ir.read();
+            let opcode = IR.read();
             switch (opcode) {
                 case PseudoCPU.OpCode.LDA: // LDA x:
                     M.load(); // MDR <- M[MAR]
@@ -218,8 +218,13 @@ var PseudoCPU;
                     let address = MDR.read() & ADDRESS_MASK;
                     PC.write(address);
                     break;
-                case PseudoCPU.OpCode.BNE:
-                    // BNE x: if (Z != 1) then PC <- MAR(address)
+                case PseudoCPU.OpCode.BNE: // BNE x:
+                    // if (Z != 1) then PC <- MAR(address)
+                    if (ALU.Z != 1) {
+                        let ADDRESS_MASK = (1 << PseudoCPU.ADDRESS_SIZE) - 1;
+                        let address = MDR.read() & ADDRESS_MASK;
+                        PC.write(address);
+                    }
                     break;
                 default:
                     throw `Unknown opcode: ${opcode}`;

@@ -48,7 +48,7 @@ namespace PseudoCPU {
 
             const copy = (dst: Register, src: Register) => dst.write(src.read());
 
-            let opcode = this._ir.read();
+            let opcode = IR.read();
             switch (opcode) {
                 case OpCode.LDA:    // LDA x:
                     M.load();       // MDR <- M[MAR]
@@ -68,8 +68,13 @@ namespace PseudoCPU {
                     let address = MDR.read() & ADDRESS_MASK;
                     PC.write(address);
                     break;
-                case OpCode.BNE:
-                    // BNE x: if (Z != 1) then PC <- MAR(address)
+                case OpCode.BNE:    // BNE x:
+                                    // if (Z != 1) then PC <- MAR(address)
+                    if (ALU.Z != 1) {
+                        let ADDRESS_MASK = (1 << ADDRESS_SIZE) - 1;
+                        let address = MDR.read() & ADDRESS_MASK;
+                        PC.write(address);
+                    }
                     break;
                 default:
                     throw `Unknown opcode: ${opcode}`;
