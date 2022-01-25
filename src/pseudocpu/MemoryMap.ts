@@ -2,7 +2,13 @@ namespace PseudoCPU {
     type MemoryMapping = {
         read: (address: number) => number,
         write: (address: number, value: number) => void
-    };
+    }
+
+    export enum MemoryAccess {
+        READ,
+        WRITE,
+        READ_WRITE
+    }
 
     export class MemoryMap {
         // A map from address range [start, end] to a read/writable memory location.
@@ -51,12 +57,18 @@ namespace PseudoCPU {
             }
         }
 
-        public mapExternalMemory(start: number, length: number, M: Memory) {
+        public mapExternalMemory(start: number, length: number, mode: MemoryAccess, M: Memory) {
             function read(address: number): number {
+                if (mode === MemoryAccess.WRITE) {
+                    throw "Attempting to read() from WRITE-only memory"
+                }
                 return M.read(address - start);
             }
 
             function write(address: number, value: number) {
+                if (mode === MemoryAccess.READ) {
+                    throw "Attempting to write() to READ-only memory"
+                }
                 M.write(address - start, value);
             }
             

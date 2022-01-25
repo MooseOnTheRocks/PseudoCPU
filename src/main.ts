@@ -74,8 +74,8 @@ namespace PseudoCPU {
 
         const DATA_BEGIN = 0x0000;
         const PROG_BEGIN = 0x0100;
-        M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, DATA);
-        M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, PROG);
+        M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, MemoryAccess.READ_WRITE, DATA);
+        M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, MemoryAccess.READ, PROG);
         // Place PC on first program instruction.
         PC.write(PROG_BEGIN);
 

@@ -26,6 +26,12 @@ var PseudoCPU;
 })(PseudoCPU || (PseudoCPU = {}));
 var PseudoCPU;
 (function (PseudoCPU) {
+    let MemoryAccess;
+    (function (MemoryAccess) {
+        MemoryAccess[MemoryAccess["READ"] = 0] = "READ";
+        MemoryAccess[MemoryAccess["WRITE"] = 1] = "WRITE";
+        MemoryAccess[MemoryAccess["READ_WRITE"] = 2] = "READ_WRITE";
+    })(MemoryAccess = PseudoCPU.MemoryAccess || (PseudoCPU.MemoryAccess = {}));
     class MemoryMap {
         constructor(mdr, mar) {
             this._mdr = mdr;
@@ -64,11 +70,17 @@ var PseudoCPU;
                 mapping.write(address, data);
             }
         }
-        mapExternalMemory(start, length, M) {
+        mapExternalMemory(start, length, mode, M) {
             function read(address) {
+                if (mode === MemoryAccess.WRITE) {
+                    throw "Attempting to read() from WRITE-only memory";
+                }
                 return M.read(address - start);
             }
             function write(address, value) {
+                if (mode === MemoryAccess.READ) {
+                    throw "Attempting to write() to READ-only memory";
+                }
                 M.write(address - start, value);
             }
             let range = [start, start + length - 1];
@@ -373,8 +385,8 @@ var PseudoCPU;
         const CU = new PseudoCPU.ControlUnit(IR, PC, AC, MAR, MDR, ALU, M);
         const DATA_BEGIN = 0x0000;
         const PROG_BEGIN = 0x0100;
-        M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, DATA);
-        M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, PROG);
+        M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, PseudoCPU.MemoryAccess.READ_WRITE, DATA);
+        M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, PseudoCPU.MemoryAccess.READ, PROG);
         // Place PC on first program instruction.
         PC.write(PROG_BEGIN);
         // Program to compute the first 6 fibonacci numbers.
