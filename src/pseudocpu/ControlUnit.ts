@@ -6,18 +6,16 @@ namespace PseudoCPU {
         private readonly _mar: Register;
         private readonly _mdr: Register;
         private readonly _alu: ArithmeticLogicUnit;
-        private readonly _progMem: Memory;
-        private readonly _dataMem: Memory;
+        private readonly _memory: MemoryMap;
 
-        constructor(ir: Register, pc: Register, ac: Register, mar: Register, mdr: Register, alu: ArithmeticLogicUnit, programMemory: Memory, dataMemory: Memory) {
+        constructor(ir: Register, pc: Register, ac: Register, mar: Register, mdr: Register, alu: ArithmeticLogicUnit, memory: MemoryMap) {
             this._ir = ir;
             this._pc = pc;
             this._ac = ac;
             this._mar = mar;
             this._mdr = mdr;
             this._alu = alu;
-            this._progMem = programMemory;
-            this._dataMem = dataMemory;
+            this._memory = memory;
         }
 
         // Fetches, decodes, and executes the current instruction.
@@ -46,22 +44,22 @@ namespace PseudoCPU {
             // AC <- AC + MDR
             // ```
 
-            const [ IR, PC, AC, MAR, MDR, ALU, PROG, DATA ] = [ this._ir, this._pc, this._ac, this._mar, this._mdr, this._alu, this._progMem, this._dataMem ];
+            const [ IR, PC, AC, MAR, MDR, ALU, M ] = [ this._ir, this._pc, this._ac, this._mar, this._mdr, this._alu, this._memory ];
 
             const copy = (dst: Register, src: Register) => dst.write(src.read());
 
             let opcode = this._ir.read();
             switch (opcode) {
                 case OpCode.LDA:    // LDA x:
-                    DATA.load();    // MDR <- M[MAR]
+                    M.load();       // MDR <- M[MAR]
                     copy(AC, MDR);  // AC <- MDR
                     break;
                 case OpCode.STA:    // STA x:
                     copy(MDR, AC);  // MDR <- AC
-                    DATA.store();   // M[MAR] <- MDR
+                    M.store();      // M[MAR] <- MDR
                     break;
                 case OpCode.ADD:    // ADD x:
-                    DATA.load();    // MDR <- M[MAR]
+                    M.load();       // MDR <- M[MAR]
                     ALU.add();      // AC <- AC + MDR
                     break;
                 case OpCode.J:      // J x:
@@ -85,7 +83,8 @@ namespace PseudoCPU {
             // PC <- PC + 1
             this._pc.write(this._pc.read() + 1);
             // MDR <- M[MAR]
-            this._progMem.load();
+            this._memory.load();
+            // this._progMem.load();
             // IR <- MDR(opcode)
             let OPCODE_SHIFT = WORD_SIZE - OPCODE_SIZE;
             let opcode = this._mdr.read() >> OPCODE_SHIFT;

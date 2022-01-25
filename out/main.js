@@ -1,53 +1,91 @@
 "use strict";
 var PseudoCPU;
 (function (PseudoCPU) {
-    let MemoryAccessMode;
-    (function (MemoryAccessMode) {
-        MemoryAccessMode[MemoryAccessMode["READ"] = 0] = "READ";
-        MemoryAccessMode[MemoryAccessMode["WRITE"] = 1] = "WRITE";
-        MemoryAccessMode[MemoryAccessMode["READ_WRITE"] = 2] = "READ_WRITE";
-    })(MemoryAccessMode = PseudoCPU.MemoryAccessMode || (PseudoCPU.MemoryAccessMode = {}));
-    PseudoCPU.READ = MemoryAccessMode.READ, PseudoCPU.WRITE = MemoryAccessMode.WRITE, PseudoCPU.READ_WRITE = MemoryAccessMode.READ_WRITE;
     class Memory {
-        constructor(size, mode, addressLine, dataLine) {
+        constructor(size) {
             this.SIZE = size;
-            this.MODE = mode;
             this._data = new Array(this.SIZE);
             this._data.fill(0);
-            this._mar = addressLine;
-            this._mdr = dataLine;
         }
-        store() {
-            if (this.MODE === PseudoCPU.READ) {
-                throw "Attempted store() on READ only memory";
-            }
-            let address = this._mar.read();
-            let data = this._mdr.read();
-            this._data[address] = data;
-        }
-        load() {
-            if (this.MODE === PseudoCPU.WRITE) {
-                throw "Attempted load() on WRITE only memory";
-            }
-            let address = this._mar.read();
-            let data = this._data[address];
-            this._mdr.write(data);
-        }
-        _set(address, value) {
+        write(address, value) {
             this._data[address] = value;
         }
-        _get(address) {
+        read(address) {
             return this._data[address];
         }
-        toString() {
+        toString(withOffset) {
             let lines = [];
             for (let i = 0; i < this.SIZE; i++) {
-                lines.push(`0x${i.toString(16)}: 0x${this._data[i].toString(16)}`);
+                let address = withOffset ? i + withOffset : i;
+                lines.push(`0x${address.toString(16)}: 0x${this._data[i].toString(16)}`);
             }
             return lines.join("\n");
         }
     }
     PseudoCPU.Memory = Memory;
+})(PseudoCPU || (PseudoCPU = {}));
+var PseudoCPU;
+(function (PseudoCPU) {
+    class MemoryMap {
+        constructor(mdr, mar) {
+            this._mdr = mdr;
+            this._mar = mar;
+            this.mappings = new Map();
+        }
+        findAddressMapping(address) {
+            let ranges = [...this.mappings.keys()];
+            for (const range of ranges) {
+                let [start, end] = range;
+                if (address >= start && address <= end) {
+                    return this.mappings.get(range);
+                }
+            }
+            return undefined;
+        }
+        load() {
+            let address = this._mar.read();
+            let mapping = this.findAddressMapping(address);
+            if (mapping === undefined) {
+                throw "Attempting to load() from unmapped memory";
+            }
+            else {
+                let data = mapping.read(address);
+                this._mdr.write(data);
+            }
+        }
+        store() {
+            let address = this._mar.read();
+            let mapping = this.findAddressMapping(address);
+            if (mapping === undefined) {
+                throw "Attempting to store() to unmapped memory";
+            }
+            else {
+                let data = this._mdr.read();
+                mapping.write(address, data);
+            }
+        }
+        mapExternalMemory(start, length, M) {
+            function read(address) {
+                return M.read(address - start);
+            }
+            function write(address, value) {
+                M.write(address - start, value);
+            }
+            let range = [start, start + length - 1];
+            this.mappings.set(range, { read, write });
+        }
+        mapRegister(a, R) {
+            function read(address) {
+                return R.read();
+            }
+            function write(address, value) {
+                R.write(value);
+            }
+            let range = [a, a];
+            this.mappings.set(range, { read, write });
+        }
+    }
+    PseudoCPU.MemoryMap = MemoryMap;
 })(PseudoCPU || (PseudoCPU = {}));
 var PseudoCPU;
 (function (PseudoCPU) {
@@ -75,9 +113,18 @@ var PseudoCPU;
         constructor(ac, mdr) {
             this._ac = ac;
             this._mdr = mdr;
+            this._z = new PseudoCPU.Register("Z", 1);
+        }
+        get Z() {
+            return this._z.read();
+        }
+        set Z(value) {
+            this._z.write(value);
         }
         add() {
-            this._ac.write(this._ac.read() + this._mdr.read());
+            let sum = this._ac.read() + this._mdr.read();
+            this._ac.write(sum);
+            this.Z = sum == 0 ? 1 : 0;
         }
     }
     PseudoCPU.ArithmeticLogicUnit = ArithmeticLogicUnit;
@@ -98,19 +145,32 @@ var PseudoCPU;
         OpCode[OpCode["J"] = 3] = "J";
         OpCode[OpCode["BNE"] = 4] = "BNE";
     })(OpCode = PseudoCPU.OpCode || (PseudoCPU.OpCode = {}));
+    class Instruction {
+        constructor(opcode, operand) {
+            this.opcode = opcode;
+            this.operand = operand;
+        }
+        get value() {
+            return (this.opcode << (PseudoCPU.WORD_SIZE - PseudoCPU.OPERAND_SIZE)) + this.operand;
+        }
+    }
+    PseudoCPU.Instruction = Instruction;
+    PseudoCPU.LDA = (operand) => new Instruction(OpCode.LDA, operand);
+    PseudoCPU.STA = (operand) => new Instruction(OpCode.STA, operand);
+    PseudoCPU.ADD = (operand) => new Instruction(OpCode.ADD, operand);
+    PseudoCPU.J = (operand) => new Instruction(OpCode.J, operand);
 })(PseudoCPU || (PseudoCPU = {}));
 var PseudoCPU;
 (function (PseudoCPU) {
     class ControlUnit {
-        constructor(ir, pc, ac, mar, mdr, alu, programMemory, dataMemory) {
+        constructor(ir, pc, ac, mar, mdr, alu, memory) {
             this._ir = ir;
             this._pc = pc;
             this._ac = ac;
             this._mar = mar;
             this._mdr = mdr;
             this._alu = alu;
-            this._progMem = programMemory;
-            this._dataMem = dataMemory;
+            this._memory = memory;
         }
         // Fetches, decodes, and executes the current instruction.
         // PC <- PC + 1 unless branch or jump occurs.
@@ -136,20 +196,20 @@ var PseudoCPU;
             // MDR <- M[MAR]
             // AC <- AC + MDR
             // ```
-            const [IR, PC, AC, MAR, MDR, ALU, PROG, DATA] = [this._ir, this._pc, this._ac, this._mar, this._mdr, this._alu, this._progMem, this._dataMem];
+            const [IR, PC, AC, MAR, MDR, ALU, M] = [this._ir, this._pc, this._ac, this._mar, this._mdr, this._alu, this._memory];
             const copy = (dst, src) => dst.write(src.read());
             let opcode = this._ir.read();
             switch (opcode) {
                 case PseudoCPU.OpCode.LDA: // LDA x:
-                    DATA.load(); // MDR <- M[MAR]
+                    M.load(); // MDR <- M[MAR]
                     copy(AC, MDR); // AC <- MDR
                     break;
                 case PseudoCPU.OpCode.STA: // STA x:
                     copy(MDR, AC); // MDR <- AC
-                    DATA.store(); // M[MAR] <- MDR
+                    M.store(); // M[MAR] <- MDR
                     break;
                 case PseudoCPU.OpCode.ADD: // ADD x:
-                    DATA.load(); // MDR <- M[MAR]
+                    M.load(); // MDR <- M[MAR]
                     ALU.add(); // AC <- AC + MDR
                     break;
                 case PseudoCPU.OpCode.J: // J x:
@@ -172,7 +232,8 @@ var PseudoCPU;
             // PC <- PC + 1
             this._pc.write(this._pc.read() + 1);
             // MDR <- M[MAR]
-            this._progMem.load();
+            this._memory.load();
+            // this._progMem.load();
             // IR <- MDR(opcode)
             let OPCODE_SHIFT = PseudoCPU.WORD_SIZE - PseudoCPU.OPCODE_SIZE;
             let opcode = this._mdr.read() >> OPCODE_SHIFT;
@@ -231,9 +292,10 @@ var PseudoCPU;
 // J x: PC <- MDR(address)
 // BNE x: if (z != 1) then PC <- MAR(address)
 /// <reference path="./pseudocpu/Memory.ts"/>
+/// <reference path="./pseudocpu/MemoryMap.ts"/>
 /// <reference path="./pseudocpu/Register.ts"/>
 /// <reference path="./pseudocpu/ArithmeticLogicUnit.ts"/>
-/// <reference path="./pseudocpu/OpCode.ts"/>
+/// <reference path="./pseudocpu/Instruction.ts"/>
 /// <reference path="./pseudocpu/ControlUnit.ts"/>
 var PseudoCPU;
 // == PseudoCPU Micro-operations
@@ -282,15 +344,17 @@ var PseudoCPU;
 // J x: PC <- MDR(address)
 // BNE x: if (z != 1) then PC <- MAR(address)
 /// <reference path="./pseudocpu/Memory.ts"/>
+/// <reference path="./pseudocpu/MemoryMap.ts"/>
 /// <reference path="./pseudocpu/Register.ts"/>
 /// <reference path="./pseudocpu/ArithmeticLogicUnit.ts"/>
-/// <reference path="./pseudocpu/OpCode.ts"/>
+/// <reference path="./pseudocpu/Instruction.ts"/>
 /// <reference path="./pseudocpu/ControlUnit.ts"/>
 (function (PseudoCPU) {
     PseudoCPU.WORD_SIZE = 16; // word size in bits..
     PseudoCPU.ADDRESS_SIZE = 8; // address size in bits.
     PseudoCPU.OPCODE_SIZE = 8; // opcode size in bits.
-    PseudoCPU.PROGRAM_MEMORY_SIZE = 8; // addressable words of program memory.
+    PseudoCPU.OPERAND_SIZE = 8; // operand size in bits.
+    PseudoCPU.PROGRAM_MEMORY_SIZE = 16; // addressable words of program memory.
     PseudoCPU.DATA_MEMORY_SIZE = 8; // addressable words of data memory.
     function main() {
         let PC = new PseudoCPU.Register("PC", PseudoCPU.ADDRESS_SIZE);
@@ -299,44 +363,55 @@ var PseudoCPU;
         let MDR = new PseudoCPU.Register("MDR", PseudoCPU.WORD_SIZE);
         let MAR = new PseudoCPU.Register("MAR", PseudoCPU.ADDRESS_SIZE);
         let ALU = new PseudoCPU.ArithmeticLogicUnit(AC, MDR);
-        let PROG = new PseudoCPU.Memory(PseudoCPU.PROGRAM_MEMORY_SIZE, PseudoCPU.READ, MAR, MDR);
-        // LDA  0x07; AC <- M[0x07]
-        PROG._set(0, 0x0007);
-        // STA  0x01; M[0x01] <- AC
-        PROG._set(1, 0x0101);
-        // ADD  0x01; AC <- AC + MDR
-        PROG._set(2, 0x0201);
-        // STA  0x00; M[0x00] <- AC
-        PROG._set(3, 0x0100);
-        let DATA = new PseudoCPU.Memory(PseudoCPU.DATA_MEMORY_SIZE, PseudoCPU.READ_WRITE, MAR, MDR);
-        // M[0x07] = 0xbe
-        DATA._set(0x07, 0xbe);
-        let CU = new PseudoCPU.ControlUnit(IR, PC, AC, MAR, MDR, ALU, PROG, DATA);
+        let PROG = new PseudoCPU.Memory(PseudoCPU.PROGRAM_MEMORY_SIZE);
+        let DATA = new PseudoCPU.Memory(PseudoCPU.DATA_MEMORY_SIZE);
+        let M = new PseudoCPU.MemoryMap(MDR, MAR);
+        let CU = new PseudoCPU.ControlUnit(IR, PC, AC, MAR, MDR, ALU, M);
+        const DATA_BEGIN = 0x0000;
+        M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, DATA);
+        const PROG_BEGIN = 0x0100;
+        M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, PROG);
+        // Place PC on first program instruction.
+        PC.write(PROG_BEGIN);
+        // Program to compute the first 5 fibonacci numbers.
+        let program = [
+            PseudoCPU.LDA(0x00),
+            PseudoCPU.ADD(0x00),
+            PseudoCPU.STA(0x01),
+            PseudoCPU.ADD(0x00),
+            PseudoCPU.STA(0x02),
+            PseudoCPU.ADD(0x01),
+            PseudoCPU.STA(0x03),
+            PseudoCPU.ADD(0x02),
+            PseudoCPU.STA(0x04),
+        ];
+        program.forEach((instruction, address) => {
+            PROG.write(address, instruction.value);
+        });
+        let NUM_INSTRUCTIONS = program.length;
+        // Initial fibonacci number (1).
+        DATA.write(0x00, 0x0001); // M[0x00] = 0x0001
         function printState() {
             let print = (...args) => console.log(...args.map(value => value.toString()));
             print("==========");
             print("== Registers");
             print(PC);
             print(IR, "=>", PseudoCPU.OpCode[IR.read()]);
-            print(AC);
+            print(AC, "|", `Z=${ALU.Z}`);
             print(MDR);
             print(MAR);
             print("== Program Memory");
-            print(PROG);
+            print(PROG.toString(PROG_BEGIN));
             print("== Data Memory");
-            print(DATA);
+            print(DATA.toString(DATA_BEGIN));
             print("\n");
         }
         console.log("== Initial State");
         printState();
-        CU.step();
-        printState();
-        CU.step();
-        printState();
-        CU.step();
-        printState();
-        CU.step();
-        printState();
+        for (let i = 0; i < NUM_INSTRUCTIONS; i++) {
+            CU.step();
+            printState();
+        }
     }
     PseudoCPU.main = main;
 })(PseudoCPU || (PseudoCPU = {}));
