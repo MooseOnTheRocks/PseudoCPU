@@ -213,11 +213,22 @@ var PseudoCPU;
             this._alu = alu;
             this._memory = memory;
         }
-        // Fetches, decodes, and executes the current instruction.
-        // PC <- PC + 1 unless branch or jump occurs.
-        step() {
-            this.fetchAndDecodeNextInstruction();
-            this.executeInstruction();
+        // Performs instruction fetch and decode.
+        fetchAndDecodeNextInstruction() {
+            // MAR <- PC
+            this._mar.write(this._pc.read());
+            // PC <- PC + 1
+            this._pc.write(this._pc.read() + 1);
+            // MDR <- M[MAR]
+            this._memory.load();
+            // IR <- MDR(opcode)
+            let OPCODE_SHIFT = PseudoCPU.WORD_SIZE - PseudoCPU.OPCODE_SIZE;
+            let opcode = this._mdr.read() >> OPCODE_SHIFT;
+            this._ir.write(opcode);
+            // MAR <- MDR(address)
+            let ADDRESS_MASK = (1 << PseudoCPU.ADDRESS_SIZE) - 1;
+            let address = this._mdr.read() & ADDRESS_MASK;
+            this._mar.write(address);
         }
         executeInstruction() {
             // Instruction memory format:
@@ -280,25 +291,44 @@ var PseudoCPU;
                     throw `Unknown opcode: ${opcode}`;
             }
         }
-        // Performs instruction fetch and decode.
-        fetchAndDecodeNextInstruction() {
-            // MAR <- PC
-            this._mar.write(this._pc.read());
-            // PC <- PC + 1
-            this._pc.write(this._pc.read() + 1);
-            // MDR <- M[MAR]
-            this._memory.load();
-            // IR <- MDR(opcode)
-            let OPCODE_SHIFT = PseudoCPU.WORD_SIZE - PseudoCPU.OPCODE_SIZE;
-            let opcode = this._mdr.read() >> OPCODE_SHIFT;
-            this._ir.write(opcode);
-            // MAR <- MDR(address)
-            let ADDRESS_MASK = (1 << PseudoCPU.ADDRESS_SIZE) - 1;
-            let address = this._mdr.read() & ADDRESS_MASK;
-            this._mar.write(address);
-        }
     }
     PseudoCPU.ControlUnit = ControlUnit;
+})(PseudoCPU || (PseudoCPU = {}));
+var PseudoCPU;
+(function (PseudoCPU) {
+    class ECE375PseudoCPU {
+        constructor(components) {
+            this.WORD_SIZE = 16; // word size in bits.
+            this.ADDRESS_SIZE = 13; // address size in bits; 2**13 = 0x2000 = 8192 addressable words memory.
+            this.OPCODE_SIZE = 3; // opcode size in bits, 2**3 = 8 unique opcodes.
+            this.OPERAND_SIZE = PseudoCPU.ADDRESS_SIZE; // operand size in bits.
+            this.PC = components.PC;
+            this.IR = components.IR;
+            this.AC = components.AC;
+            this.MDR = components.MDR;
+            this.MAR = components.MAR;
+            this.ALU = components.ALU;
+            this.PROG = components.PROG;
+            this.DATA = components.DATA;
+            this.M = components.M;
+            this.CU = components.CU;
+            this.PROGRAM_MEMORY_SIZE = this.PROG.SIZE;
+            this.DATA_MEMORY_SIZE = this.DATA.SIZE;
+        }
+        step() {
+            // == Fetch Cycle
+            this.CU.fetchAndDecodeNextInstruction();
+            // == Execute Cycle
+            this.CU.executeInstruction();
+        }
+        loadProgram(program, start) {
+            program.forEach((instruction, address) => {
+                address += start ? start : 0;
+                this.PROG.write(address, instruction.value);
+            });
+        }
+    }
+    PseudoCPU.ECE375PseudoCPU = ECE375PseudoCPU;
 })(PseudoCPU || (PseudoCPU = {}));
 // == PseudoISA
 // -- Data Transfer Instructions
@@ -328,8 +358,10 @@ var PseudoCPU;
 // -- Control Transfer
 //      [Jump]
 //          J x; Jump to instruction in memory location x.
+//          Transfers the program control to the instruction
+//          specified by the target address.
 //      [BNE]
-//          BNE x; Jump to instruction in memory location x if content of AC is not zero
+//          BNE x; Jump to instruction in memory location x if content of AC is not zero.
 //          Transfers the program control to the instruction
 //          specified by the target address if Z != 0.
 // 
@@ -390,6 +422,7 @@ var PseudoCPU;
 /// <reference path="./pseudocpu/ArithmeticLogicUnit.ts"/>
 /// <reference path="./pseudocpu/Instruction.ts"/>
 /// <reference path="./pseudocpu/ControlUnit.ts"/>
+/// <reference path="./pseudocpu/CentralProcessingUnit.ts"/>
 var PseudoCPU;
 // == PseudoISA
 // -- Data Transfer Instructions
@@ -419,8 +452,10 @@ var PseudoCPU;
 // -- Control Transfer
 //      [Jump]
 //          J x; Jump to instruction in memory location x.
+//          Transfers the program control to the instruction
+//          specified by the target address.
 //      [BNE]
-//          BNE x; Jump to instruction in memory location x if content of AC is not zero
+//          BNE x; Jump to instruction in memory location x if content of AC is not zero.
 //          Transfers the program control to the instruction
 //          specified by the target address if Z != 0.
 // 
@@ -481,6 +516,7 @@ var PseudoCPU;
 /// <reference path="./pseudocpu/ArithmeticLogicUnit.ts"/>
 /// <reference path="./pseudocpu/Instruction.ts"/>
 /// <reference path="./pseudocpu/ControlUnit.ts"/>
+/// <reference path="./pseudocpu/CentralProcessingUnit.ts"/>
 (function (PseudoCPU) {
     PseudoCPU.WORD_SIZE = 16; // word size in bits.
     PseudoCPU.ADDRESS_SIZE = 13; // address size in bits; 2**13 = 0x2000 = 8192 addressable words memory.
@@ -499,29 +535,37 @@ var PseudoCPU;
         const DATA = new PseudoCPU.Memory(PseudoCPU.DATA_MEMORY_SIZE);
         const M = new PseudoCPU.MemoryMap(MDR, MAR);
         const CU = new PseudoCPU.ControlUnit(IR, PC, AC, MAR, MDR, ALU, M);
-        const DATA_BEGIN = 0x0000;
-        const PROG_BEGIN = DATA.SIZE;
+        // Assemble the CPU.
+        const CPU = new PseudoCPU.ECE375PseudoCPU({
+            PC, IR, AC, MDR, MAR, ALU, PROG, DATA, M, CU
+        });
+        // Map data and program memory locations onto the MemoryMap.
+        // Place 
+        const DATA_BEGIN = PROG.SIZE;
+        // Place program starting immedietaly after DATA.
+        const PROG_BEGIN = 0;
         M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, PseudoCPU.MemoryAccess.READ_WRITE, DATA);
         M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, PseudoCPU.MemoryAccess.READ, PROG);
-        // Place PC on first program instruction.
+        // Point PC to first program instruction.
         PC.write(PROG_BEGIN);
         // Program to compute the code C = 4*A + B.
-        let A = 0;
-        let B = 1;
-        let C = 2;
+        // Labels from perspective of MemoryMap.
+        let A = DATA_BEGIN; // Label A = DATA[0]
+        let B = DATA_BEGIN + 1; // Label B = DATA[1]
+        let C = DATA_BEGIN + 2; // Label C = DATA[2]
         const program = [
             PseudoCPU.LDA(A),
             PseudoCPU.SHFT(),
             PseudoCPU.SHFT(),
             PseudoCPU.ADD(B),
-            PseudoCPU.STA(C)
+            PseudoCPU.STA(C),
         ];
-        // Write the program into memory.
-        program.forEach((instruction, address) => {
-            PROG.write(address, instruction.value);
-        });
-        DATA.write(A, 80);
-        DATA.write(B, 20); // M[0x00] = 0x0001
+        // Write the program into program memory.
+        CPU.loadProgram(program);
+        // Write initial values into data memory.
+        // Normalizing labels since I'm writing to Memory (local address) not MemoryMap (mapped address).
+        DATA.write(A - DATA_BEGIN, 20); // M[A] = 20
+        DATA.write(B - DATA_BEGIN, 20); // M[B] = 20
         function printState() {
             const print = (...args) => console.log(...args.map(value => value.toString()));
             print("==========");
@@ -537,11 +581,14 @@ var PseudoCPU;
             print(DATA.toString(DATA_BEGIN));
             print("\n");
         }
+        // Run every instruction in the program.
+        // Print the CPU state after each step.
         console.log("== Initial State");
         printState();
         const NUM_INSTRUCTIONS = program.length;
         for (let i = 0; i < NUM_INSTRUCTIONS; i++) {
-            CU.step();
+            CPU.step();
+            console.log(`Step #${i + 1}`);
             printState();
         }
     }

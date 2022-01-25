@@ -18,14 +18,25 @@ namespace PseudoCPU {
             this._memory = memory;
         }
 
-        // Fetches, decodes, and executes the current instruction.
-        // PC <- PC + 1 unless branch or jump occurs.
-        public step(): void {
-            this.fetchAndDecodeNextInstruction();
-            this.executeInstruction();
+        // Performs instruction fetch and decode.
+        public fetchAndDecodeNextInstruction() {
+            // MAR <- PC
+            this._mar.write(this._pc.read());
+            // PC <- PC + 1
+            this._pc.write(this._pc.read() + 1);
+            // MDR <- M[MAR]
+            this._memory.load();
+            // IR <- MDR(opcode)
+            let OPCODE_SHIFT = WORD_SIZE - OPCODE_SIZE;
+            let opcode = this._mdr.read() >> OPCODE_SHIFT;
+            this._ir.write(opcode);
+            // MAR <- MDR(address)
+            let ADDRESS_MASK = (1 << ADDRESS_SIZE) - 1;
+            let address = this._mdr.read() & ADDRESS_MASK;
+            this._mar.write(address);
         }
 
-        private executeInstruction() {
+        public executeInstruction() {
             // Instruction memory format:
             //      [Instruction: WORD_SIZE] =
             //          [opcode: OPCODE_SIZE] [operand: ADDRESS_SIZE]
@@ -42,7 +53,7 @@ namespace PseudoCPU {
             // J x: PC <- MDR(address)
             // BNE x: if (z != 1) then PC <- MAR(address)
 
-            const [ IR, PC, AC, MAR, MDR, ALU, M ] = [ this._ir, this._pc, this._ac, this._mar, this._mdr, this._alu, this._memory ];
+            const [IR, PC, AC, MAR, MDR, ALU, M] = [this._ir, this._pc, this._ac, this._mar, this._mdr, this._alu, this._memory];
 
             const copy = (dst: Register, src: Register) => dst.write(src.read());
 
@@ -88,24 +99,6 @@ namespace PseudoCPU {
                 default:
                     throw `Unknown opcode: ${opcode}`;
             }
-        }
-
-        // Performs instruction fetch and decode.
-        private fetchAndDecodeNextInstruction() {
-            // MAR <- PC
-            this._mar.write(this._pc.read());
-            // PC <- PC + 1
-            this._pc.write(this._pc.read() + 1);
-            // MDR <- M[MAR]
-            this._memory.load();
-            // IR <- MDR(opcode)
-            let OPCODE_SHIFT = WORD_SIZE - OPCODE_SIZE;
-            let opcode = this._mdr.read() >> OPCODE_SHIFT;
-            this._ir.write(opcode);
-            // MAR <- MDR(address)
-            let ADDRESS_MASK = (1 << ADDRESS_SIZE) - 1;
-            let address = this._mdr.read() & ADDRESS_MASK;
-            this._mar.write(address);
         }
     }
 }

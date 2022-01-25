@@ -27,8 +27,10 @@
 // -- Control Transfer
 //      [Jump]
 //          J x; Jump to instruction in memory location x.
+//          Transfers the program control to the instruction
+//          specified by the target address.
 //      [BNE]
-//          BNE x; Jump to instruction in memory location x if content of AC is not zero
+//          BNE x; Jump to instruction in memory location x if content of AC is not zero.
 //          Transfers the program control to the instruction
 //          specified by the target address if Z != 0.
 // 
@@ -90,6 +92,7 @@
 /// <reference path="./pseudocpu/ArithmeticLogicUnit.ts"/>
 /// <reference path="./pseudocpu/Instruction.ts"/>
 /// <reference path="./pseudocpu/ControlUnit.ts"/>
+/// <reference path="./pseudocpu/CentralProcessingUnit.ts"/>
 
 namespace PseudoCPU {
     export const WORD_SIZE = 16; // word size in bits.
@@ -111,33 +114,39 @@ namespace PseudoCPU {
         const DATA = new Memory(DATA_MEMORY_SIZE);
         const M = new MemoryMap(MDR, MAR);
         const CU = new ControlUnit(IR, PC, AC, MAR, MDR, ALU, M);
+        // Assemble the CPU.
+        const CPU = new ECE375PseudoCPU({
+            PC, IR, AC, MDR, MAR, ALU, PROG, DATA, M, CU
+        });
 
-        const DATA_BEGIN = 0x0000;
-        const PROG_BEGIN = DATA.SIZE;
+        // Map data and program memory locations onto the MemoryMap.
+        // Place 
+        const DATA_BEGIN = PROG.SIZE;
+        // Place program starting immedietaly after DATA.
+        const PROG_BEGIN = 0;
         M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, MemoryAccess.READ_WRITE, DATA);
         M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, MemoryAccess.READ, PROG);
-        // Place PC on first program instruction.
+        // Point PC to first program instruction.
         PC.write(PROG_BEGIN);
 
         // Program to compute the code C = 4*A + B.
-        let A = 0;
-        let B = 1;
-        let C = 2;
+        // Labels from perspective of MemoryMap.
+        let A = DATA_BEGIN;     // Label A = DATA[0]
+        let B = DATA_BEGIN + 1; // Label B = DATA[1]
+        let C = DATA_BEGIN + 2; // Label C = DATA[2]
         const program: Array<Instruction> = [
             LDA(A),
             SHFT(),
             SHFT(),
             ADD(B),
-            STA(C)
+            STA(C),
         ];
-
-        // Write the program into memory.
-        program.forEach((instruction, address) => {
-            PROG.write(address, instruction.value);
-        });
-
-        DATA.write(A, 80);
-        DATA.write(B, 20);    // M[0x00] = 0x0001
+        // Write the program into program memory.
+        CPU.loadProgram(program);
+        // Write initial values into data memory.
+        // Normalizing labels since I'm writing to Memory (local address) not MemoryMap (mapped address).
+        DATA.write(A - DATA_BEGIN, 20);    // M[A] = 20
+        DATA.write(B - DATA_BEGIN, 20);    // M[B] = 20
 
         function printState() {
             const print = (...args: Array<{toString(): String}>) => console.log(...args.map(value => value.toString()));
@@ -155,11 +164,14 @@ namespace PseudoCPU {
             print("\n");
         }
 
+        // Run every instruction in the program.
+        // Print the CPU state after each step.
         console.log("== Initial State");
         printState();
         const NUM_INSTRUCTIONS = program.length;
         for (let i = 0; i < NUM_INSTRUCTIONS; i++) {
-            CU.step();
+            CPU.step();
+            console.log(`Step #${i + 1}`)
             printState();
         }
     }
