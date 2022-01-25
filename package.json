@@ -1,0 +1,13 @@
+{
+  "name": "pseudocpu",
+  "version": "1.0.0",
+  "description": "An implementation of the Pseudo-CPU from ECE 375",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "START \"\" tsc -w",
+    "start": "node ./out/main.js"
+  },
+  "author": "Samuel Foltz",
+  "license": "ISC"
+}
