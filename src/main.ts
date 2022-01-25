@@ -61,48 +61,50 @@ namespace PseudoCPU {
     export const DATA_MEMORY_SIZE = 8; // addressable words of data memory.
 
     export function main() {
-        let PC = new Register("PC", ADDRESS_SIZE);
-        let IR = new Register("IR", OPCODE_SIZE);
-        let AC = new Register("AC", WORD_SIZE);
-        let MDR = new Register("MDR", WORD_SIZE);
-        let MAR = new Register("MAR", ADDRESS_SIZE);
-        let ALU = new ArithmeticLogicUnit(AC, MDR);
-        let PROG = new Memory(PROGRAM_MEMORY_SIZE);
-        let DATA = new Memory(DATA_MEMORY_SIZE);
-        let M = new MemoryMap(MDR, MAR);
-        let CU = new ControlUnit(IR, PC, AC, MAR, MDR, ALU, M);
+        const PC = new Register("PC", ADDRESS_SIZE);
+        const IR = new Register("IR", OPCODE_SIZE);
+        const AC = new Register("AC", WORD_SIZE);
+        const MDR = new Register("MDR", WORD_SIZE);
+        const MAR = new Register("MAR", ADDRESS_SIZE);
+        const ALU = new ArithmeticLogicUnit(AC, MDR);
+        const PROG = new Memory(PROGRAM_MEMORY_SIZE);
+        const DATA = new Memory(DATA_MEMORY_SIZE);
+        const M = new MemoryMap(MDR, MAR);
+        const CU = new ControlUnit(IR, PC, AC, MAR, MDR, ALU, M);
 
         const DATA_BEGIN = 0x0000;
-        M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, DATA);
         const PROG_BEGIN = 0x0100;
+        M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, DATA);
         M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, PROG);
         // Place PC on first program instruction.
         PC.write(PROG_BEGIN);
 
-        // Program to compute the first 5 fibonacci numbers.
-        let program: Array<Instruction> = [
-            LDA(0x00),
-            ADD(0x00),
-            STA(0x01),
-            ADD(0x00),
-            STA(0x02),
-            ADD(0x01),
+        // Program to compute the first 6 fibonacci numbers.
+        const program: Array<Instruction> = [
+            LDA(0x00),  // Load initial number from memory (1)
+            ADD(0x00),  // Add with itself (1 + 1 = 2)
+            STA(0x01),  // Store in memory
+            ADD(0x00),  // Add with previous number (2 + 1 = 3)
+            STA(0x02),  // Store in memory
+            ADD(0x01),  // Repeat...
             STA(0x03),
             ADD(0x02),
             STA(0x04),
+            ADD(0x03),
+            STA(0x05),
+            LDA(0x07),  // Load 0 into MDR and AC
+            ADD(0x07),  // 0 + 0 = 0, Z flag on ALU should be set
         ];
-
+        // Write the program into memory.
         program.forEach((instruction, address) => {
             PROG.write(address, instruction.value);
         });
 
-        let NUM_INSTRUCTIONS = program.length;
-
-        // Initial fibonacci number (1).
+        // Place initial fibonacci number (1) in data.
         DATA.write(0x00, 0x0001);    // M[0x00] = 0x0001
 
         function printState() {
-            let print = (...args: Array<{toString(): String}>) => console.log(...args.map(value => value.toString()));
+            const print = (...args: Array<{toString(): String}>) => console.log(...args.map(value => value.toString()));
             print("==========");
             print("== Registers");
             print(PC);
@@ -119,6 +121,7 @@ namespace PseudoCPU {
 
         console.log("== Initial State");
         printState();
+        const NUM_INSTRUCTIONS = program.length;
         for (let i = 0; i < NUM_INSTRUCTIONS; i++) {
             CU.step();
             printState();

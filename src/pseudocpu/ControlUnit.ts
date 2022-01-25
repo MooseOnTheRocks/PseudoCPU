@@ -89,7 +89,6 @@ namespace PseudoCPU {
             this._pc.write(this._pc.read() + 1);
             // MDR <- M[MAR]
             this._memory.load();
-            // this._progMem.load();
             // IR <- MDR(opcode)
             let OPCODE_SHIFT = WORD_SIZE - OPCODE_SIZE;
             let opcode = this._mdr.read() >> OPCODE_SHIFT;

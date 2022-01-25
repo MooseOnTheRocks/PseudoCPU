@@ -238,7 +238,6 @@ var PseudoCPU;
             this._pc.write(this._pc.read() + 1);
             // MDR <- M[MAR]
             this._memory.load();
-            // this._progMem.load();
             // IR <- MDR(opcode)
             let OPCODE_SHIFT = PseudoCPU.WORD_SIZE - PseudoCPU.OPCODE_SIZE;
             let opcode = this._mdr.read() >> OPCODE_SHIFT;
@@ -362,24 +361,24 @@ var PseudoCPU;
     PseudoCPU.PROGRAM_MEMORY_SIZE = 16; // addressable words of program memory.
     PseudoCPU.DATA_MEMORY_SIZE = 8; // addressable words of data memory.
     function main() {
-        let PC = new PseudoCPU.Register("PC", PseudoCPU.ADDRESS_SIZE);
-        let IR = new PseudoCPU.Register("IR", PseudoCPU.OPCODE_SIZE);
-        let AC = new PseudoCPU.Register("AC", PseudoCPU.WORD_SIZE);
-        let MDR = new PseudoCPU.Register("MDR", PseudoCPU.WORD_SIZE);
-        let MAR = new PseudoCPU.Register("MAR", PseudoCPU.ADDRESS_SIZE);
-        let ALU = new PseudoCPU.ArithmeticLogicUnit(AC, MDR);
-        let PROG = new PseudoCPU.Memory(PseudoCPU.PROGRAM_MEMORY_SIZE);
-        let DATA = new PseudoCPU.Memory(PseudoCPU.DATA_MEMORY_SIZE);
-        let M = new PseudoCPU.MemoryMap(MDR, MAR);
-        let CU = new PseudoCPU.ControlUnit(IR, PC, AC, MAR, MDR, ALU, M);
+        const PC = new PseudoCPU.Register("PC", PseudoCPU.ADDRESS_SIZE);
+        const IR = new PseudoCPU.Register("IR", PseudoCPU.OPCODE_SIZE);
+        const AC = new PseudoCPU.Register("AC", PseudoCPU.WORD_SIZE);
+        const MDR = new PseudoCPU.Register("MDR", PseudoCPU.WORD_SIZE);
+        const MAR = new PseudoCPU.Register("MAR", PseudoCPU.ADDRESS_SIZE);
+        const ALU = new PseudoCPU.ArithmeticLogicUnit(AC, MDR);
+        const PROG = new PseudoCPU.Memory(PseudoCPU.PROGRAM_MEMORY_SIZE);
+        const DATA = new PseudoCPU.Memory(PseudoCPU.DATA_MEMORY_SIZE);
+        const M = new PseudoCPU.MemoryMap(MDR, MAR);
+        const CU = new PseudoCPU.ControlUnit(IR, PC, AC, MAR, MDR, ALU, M);
         const DATA_BEGIN = 0x0000;
-        M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, DATA);
         const PROG_BEGIN = 0x0100;
+        M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, DATA);
         M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, PROG);
         // Place PC on first program instruction.
         PC.write(PROG_BEGIN);
-        // Program to compute the first 5 fibonacci numbers.
-        let program = [
+        // Program to compute the first 6 fibonacci numbers.
+        const program = [
             PseudoCPU.LDA(0x00),
             PseudoCPU.ADD(0x00),
             PseudoCPU.STA(0x01),
@@ -389,15 +388,19 @@ var PseudoCPU;
             PseudoCPU.STA(0x03),
             PseudoCPU.ADD(0x02),
             PseudoCPU.STA(0x04),
+            PseudoCPU.ADD(0x03),
+            PseudoCPU.STA(0x05),
+            PseudoCPU.LDA(0x07),
+            PseudoCPU.ADD(0x07), // 0 + 0 = 0, Z flag on ALU should be set
         ];
+        // Write the program into memory.
         program.forEach((instruction, address) => {
             PROG.write(address, instruction.value);
         });
-        let NUM_INSTRUCTIONS = program.length;
-        // Initial fibonacci number (1).
+        // Place initial fibonacci number (1) in data.
         DATA.write(0x00, 0x0001); // M[0x00] = 0x0001
         function printState() {
-            let print = (...args) => console.log(...args.map(value => value.toString()));
+            const print = (...args) => console.log(...args.map(value => value.toString()));
             print("==========");
             print("== Registers");
             print(PC);
@@ -413,6 +416,7 @@ var PseudoCPU;
         }
         console.log("== Initial State");
         printState();
+        const NUM_INSTRUCTIONS = program.length;
         for (let i = 0; i < NUM_INSTRUCTIONS; i++) {
             CU.step();
             printState();
