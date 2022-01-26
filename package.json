@@ -4,10 +4,9 @@
   "description": "An implementation of the Pseudo-CPU from ECE 375",
   "main": "./out/main.js",
   "scripts": {
-    "build": "webpack",
-    "dev": "START \"\" webpack",
+    "build": "rm -rf ./out/* & webpack",
+    "dev": "START \"\" webpack watch",
     "start": "node ./out/main.js",
-    "test": "node ./out/tests.js",
     "clean": "rm -rf ./out"
   },
   "author": "Samuel Foltz",

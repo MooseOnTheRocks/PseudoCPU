@@ -1,8 +1,10 @@
 export class Memory {
+    public readonly NAME: string;
     public readonly SIZE: number;
     private _data: Array<number>;
 
-    constructor(size: number) {
+    constructor(name: string, size: number) {
+        this.NAME = name;
         this.SIZE = size;
         this._data = new Array<number>(this.SIZE);
         this._data.fill(0);

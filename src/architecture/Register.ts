@@ -1,10 +1,10 @@
 export class Register {
-    public readonly name: string;
+    public readonly NAME: string;
     public readonly SIZE: number;
     private _data: number;
 
     constructor(name: string, size: number) {
-        this.name = name;
+        this.NAME = name;
         this.SIZE = size;
         this._data = 0;
     }
@@ -18,6 +18,6 @@ export class Register {
     }
 
     public toString() {
-        return `${this.name}<0x${this._data.toString(16)}>`;
+        return `${this.NAME}<0x${this._data.toString(16)}>`;
     }
 }

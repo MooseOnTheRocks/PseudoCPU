@@ -1,5 +1,5 @@
-import { Register } from "./Register";
-import { Memory } from "./Memory";
+import { Register } from "@/Register";
+import { Memory } from "@/Memory";
 
 type MemoryMapping = {
     read: (address: number) => number,
@@ -26,13 +26,9 @@ export class MemoryMap {
 
     private findAddressMapping(address: number) {
         let ranges = [...this.mappings.keys()];
-        for (const range of ranges) {
-            let [start, end] = range;
-            if (address >= start && address <= end) {
-                return this.mappings.get(range);
-            }
-        }
-        return undefined;
+        let key = ranges.find(range => address >= range[0] && address <= range[1]);
+        let mapping = key ? this.mappings.get(key) : undefined;
+        return mapping;
     }
 
     public load() {

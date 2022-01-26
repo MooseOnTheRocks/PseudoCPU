@@ -1,19 +1,21 @@
-import {Register} from "./Register";
-import {ArithmeticLogicUnit} from "./ArithmeticLogicUnit";
-import { MemoryMap } from "./MemoryMap";
-import { OPERAND_SIZE, ADDRESS_SIZE, WORD_SIZE, OPCODE_SIZE } from "./Constants";
-import { OpCode } from "./Instruction";
+import {Register} from "@/Register";
+import { MemoryMap } from "@/MemoryMap";
+import { ControlUnit } from "@/ControlUnit";
 
-export class ControlUnit {
+import { PseudoCPU } from "./PseudoCPU";
+import { PseudoOpCode } from "./PseudoInstruction";
+import {PseudoALU} from "./PseudoALU";
+
+export class PseudoCU implements ControlUnit {
     private readonly _ir: Register;
     private readonly _pc: Register;
     private readonly _ac: Register;
     private readonly _mar: Register;
     private readonly _mdr: Register;
-    private readonly _alu: ArithmeticLogicUnit;
+    private readonly _alu: PseudoALU;
     private readonly _memory: MemoryMap;
 
-    constructor(ir: Register, pc: Register, ac: Register, mar: Register, mdr: Register, alu: ArithmeticLogicUnit, memory: MemoryMap) {
+    constructor(ir: Register, pc: Register, ac: Register, mar: Register, mdr: Register, alu: PseudoALU, memory: MemoryMap) {
         this._ir = ir;
         this._pc = pc;
         this._ac = ac;
@@ -32,22 +34,17 @@ export class ControlUnit {
         // MDR <- M[MAR]
         this._memory.load();
         // IR <- MDR(opcode)
-        let OPCODE_SHIFT = WORD_SIZE - OPCODE_SIZE;
+        let OPCODE_SHIFT = PseudoCPU.WORD_SIZE - PseudoCPU.OPCODE_SIZE;
         let opcode = this._mdr.read() >> OPCODE_SHIFT;
         this._ir.write(opcode);
         // MAR <- MDR(address)
-        let ADDRESS_MASK = (1 << ADDRESS_SIZE) - 1;
+        let ADDRESS_MASK = (1 << PseudoCPU.ADDRESS_SIZE) - 1;
         let address = this._mdr.read() & ADDRESS_MASK;
         this._mar.write(address);
     }
-
+    
+    // Executes the current instruction loaded into IR.
     public executeInstruction() {
-        // Instruction memory format:
-        //      [Instruction: WORD_SIZE] =
-        //          [opcode: OPCODE_SIZE] [operand: ADDRESS_SIZE]
-        // Operand usage is defined by the opcode.
-        // Operand address is loaded into MAR after the fetch and decode cycle.
-        //
         // == PseudoCPU Instructions
         // LDA x: MDR <- M[MAR], AC <- MDR
         // STA x: MDR <- AC, M[MAR] <- MDR
@@ -64,39 +61,39 @@ export class ControlUnit {
 
         let opcode = IR.read();
         switch (opcode) {
-            case OpCode.LDA:    // LDA x:
-                M.load();       // MDR <- M[MAR]
-                copy(AC, MDR);  // AC <- MDR
+            case PseudoOpCode.LDA:      // LDA x:
+                M.load();               // MDR <- M[MAR]
+                copy(AC, MDR);          // AC <- MDR
                 break;
-            case OpCode.STA:    // STA x:
-                copy(MDR, AC);  // MDR <- AC
-                M.store();      // M[MAR] <- MDR
+            case PseudoOpCode.STA:      // STA x:
+                copy(MDR, AC);          // MDR <- AC
+                M.store();              // M[MAR] <- MDR
                 break;
-            case OpCode.ADD:    // ADD x:
-                M.load();       // MDR <- M[MAR]
-                ALU.add();      // AC <- AC + MDR
+            case PseudoOpCode.ADD:      // ADD x:
+                M.load();               // MDR <- M[MAR]
+                ALU.add();              // AC <- AC + MDR
                 break;
-            case OpCode.SUB:    // SUB x:
-                M.load();       // MDR <- M[MAR]
-                ALU.sub();      // AC <- AC - MDR
+            case PseudoOpCode.SUB:      // SUB x:
+                M.load();               // MDR <- M[MAR]
+                ALU.sub();              // AC <- AC - MDR
                 break;
-            case OpCode.NAND:   // NAND x:
-                M.load();       // MDR <- M[MAR]
-                ALU.nand();     // AC <- ~(AC & MDR)
+            case PseudoOpCode.NAND:     // NAND x:
+                M.load();               // MDR <- M[MAR]
+                ALU.nand();             // AC <- ~(AC & MDR)
                 break;
-            case OpCode.SHFT:   // SHFT:
-                ALU.shft();     // AC <- AC << 1
+            case PseudoOpCode.SHFT:     // SHFT:
+                ALU.shft();             // AC <- AC << 1
                 break;
-            case OpCode.J:      // J x:
-                                // PC <- MDR(address)
-                let ADDRESS_MASK = (1 << ADDRESS_SIZE) - 1;
+            case PseudoOpCode.J:        // J x:
+                                        // PC <- MDR(address)
+                let ADDRESS_MASK = (1 << PseudoCPU.ADDRESS_SIZE) - 1;
                 let address = MDR.read() & ADDRESS_MASK;
                 PC.write(address);
                 break;
-            case OpCode.BNE:    // BNE x:
-                                // if (Z != 1) then PC <- MDR(address)
+            case PseudoOpCode.BNE:      // BNE x:
+                                        // if (Z != 1) then PC <- MDR(address)
                 if (ALU.Z != 1) {
-                    let ADDRESS_MASK = (1 << ADDRESS_SIZE) - 1;
+                    let ADDRESS_MASK = (1 << PseudoCPU.ADDRESS_SIZE) - 1;
                     let address = MDR.read() & ADDRESS_MASK;
                     PC.write(address);
                 }
