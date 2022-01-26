@@ -86,95 +86,86 @@
 // J x: PC <- MDR(address)
 // BNE x: if (z != 1) then PC <- MAR(address)
 
-/// <reference path="./pseudocpu/Memory.ts"/>
-/// <reference path="./pseudocpu/MemoryMap.ts"/>
-/// <reference path="./pseudocpu/Register.ts"/>
-/// <reference path="./pseudocpu/ArithmeticLogicUnit.ts"/>
-/// <reference path="./pseudocpu/Instruction.ts"/>
-/// <reference path="./pseudocpu/ControlUnit.ts"/>
-/// <reference path="./pseudocpu/ECE375PseudoCPU.ts"/>
+import { Register } from "@/Register";
+import { ArithmeticLogicUnit } from "@/ArithmeticLogicUnit";
+import { Memory } from "@/Memory";
+import { MemoryMap, MemoryAccess } from "@/MemoryMap";
+import { ControlUnit } from "@/ControlUnit";
+import { ECE375PseudoCPU } from "@/ECE375PseudoCPU";
+import { Instruction, OpCode, LDA, STA, ADD, SUB, SHFT, NAND, J, BNE } from "@/Instruction";
+import { ADDRESS_SIZE, OPCODE_SIZE, WORD_SIZE, DATA_MEMORY_SIZE, PROGRAM_MEMORY_SIZE } from "@/Constants";
 
-namespace PseudoCPU {
-    export const WORD_SIZE = 16; // word size in bits.
-    export const ADDRESS_SIZE = 13; // address size in bits; 2**13 = 0x2000 = 8192 addressable words memory.
-    export const OPCODE_SIZE = 3; // opcode size in bits, 2**3 = 8 unique opcodes.
-    export const OPERAND_SIZE = ADDRESS_SIZE; // operand size in bits.
+function main() {
+    const PC = new Register("PC", ADDRESS_SIZE);
+    const IR = new Register("IR", OPCODE_SIZE);
+    const AC = new Register("AC", WORD_SIZE);
+    const MDR = new Register("MDR", WORD_SIZE);
+    const MAR = new Register("MAR", ADDRESS_SIZE);
+    const ALU = new ArithmeticLogicUnit(AC, MDR);
+    const PROG = new Memory(PROGRAM_MEMORY_SIZE);
+    const DATA = new Memory(DATA_MEMORY_SIZE);
+    const M = new MemoryMap(MDR, MAR);
+    const CU = new ControlUnit(IR, PC, AC, MAR, MDR, ALU, M);
+    // Assemble the CPU.
+    const CPU = new ECE375PseudoCPU({
+        PC, IR, AC, MDR, MAR, ALU, PROG, DATA, M, CU
+    });
 
-    export const PROGRAM_MEMORY_SIZE = 0x08; // addressable words of program memory.
-    export const DATA_MEMORY_SIZE = 0x08; // addressable words of data memory.
+    // Map data and program memory locations onto the MemoryMap.
+    // Place 
+    const DATA_BEGIN = PROG.SIZE;
+    // Place program starting immedietaly after DATA.
+    const PROG_BEGIN = 0;
+    M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, MemoryAccess.READ_WRITE, DATA);
+    M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, MemoryAccess.READ, PROG);
+    // Point PC to first program instruction.
+    PC.write(PROG_BEGIN);
 
-    export function main() {
-        const PC = new Register("PC", ADDRESS_SIZE);
-        const IR = new Register("IR", OPCODE_SIZE);
-        const AC = new Register("AC", WORD_SIZE);
-        const MDR = new Register("MDR", WORD_SIZE);
-        const MAR = new Register("MAR", ADDRESS_SIZE);
-        const ALU = new ArithmeticLogicUnit(AC, MDR);
-        const PROG = new Memory(PROGRAM_MEMORY_SIZE);
-        const DATA = new Memory(DATA_MEMORY_SIZE);
-        const M = new MemoryMap(MDR, MAR);
-        const CU = new ControlUnit(IR, PC, AC, MAR, MDR, ALU, M);
-        // Assemble the CPU.
-        const CPU = new ECE375PseudoCPU({
-            PC, IR, AC, MDR, MAR, ALU, PROG, DATA, M, CU
-        });
+    // Program to compute the code C = 4*A + B.
+    // Labels from perspective of MemoryMap.
+    let A = DATA_BEGIN;     // Label A = DATA[0]
+    let B = DATA_BEGIN + 1; // Label B = DATA[1]
+    let C = DATA_BEGIN + 2; // Label C = DATA[2]
+    const program: Array<Instruction> = [
+        LDA(A),
+        SHFT(),
+        SHFT(),
+        ADD(B),
+        STA(C),
+    ];
+    // Write the program into program memory.
+    CPU.loadProgram(program);
+    // Write initial values into data memory.
+    // Normalizing labels since I'm writing to Memory (local address) not MemoryMap (mapped address).
+    DATA.write(A - DATA_BEGIN, 20);    // M[A] = 20
+    DATA.write(B - DATA_BEGIN, 20);    // M[B] = 20
 
-        // Map data and program memory locations onto the MemoryMap.
-        // Place 
-        const DATA_BEGIN = PROG.SIZE;
-        // Place program starting immedietaly after DATA.
-        const PROG_BEGIN = 0;
-        M.mapExternalMemory(DATA_BEGIN, DATA.SIZE, MemoryAccess.READ_WRITE, DATA);
-        M.mapExternalMemory(PROG_BEGIN, PROG.SIZE, MemoryAccess.READ, PROG);
-        // Point PC to first program instruction.
-        PC.write(PROG_BEGIN);
+    function printState() {
+        const print = (...args: Array<{toString(): String}>) => console.log(...args.map(value => value.toString()));
+        print("==========");
+        print("== Registers");
+        print(PC);
+        print(IR, "=>", OpCode[IR.read()]);
+        print(AC, "|", `Z=${ALU.Z}`);
+        print(MDR);
+        print(MAR);
+        print("== Program Memory")
+        print(PROG.toString(PROG_BEGIN));
+        print("== Data Memory");
+        print(DATA.toString(DATA_BEGIN));
+        print("\n");
+    }
 
-        // Program to compute the code C = 4*A + B.
-        // Labels from perspective of MemoryMap.
-        let A = DATA_BEGIN;     // Label A = DATA[0]
-        let B = DATA_BEGIN + 1; // Label B = DATA[1]
-        let C = DATA_BEGIN + 2; // Label C = DATA[2]
-        const program: Array<Instruction> = [
-            LDA(A),
-            SHFT(),
-            SHFT(),
-            ADD(B),
-            STA(C),
-        ];
-        // Write the program into program memory.
-        CPU.loadProgram(program);
-        // Write initial values into data memory.
-        // Normalizing labels since I'm writing to Memory (local address) not MemoryMap (mapped address).
-        DATA.write(A - DATA_BEGIN, 20);    // M[A] = 20
-        DATA.write(B - DATA_BEGIN, 20);    // M[B] = 20
-
-        function printState() {
-            const print = (...args: Array<{toString(): String}>) => console.log(...args.map(value => value.toString()));
-            print("==========");
-            print("== Registers");
-            print(PC);
-            print(IR, "=>", OpCode[IR.read()]);
-            print(AC, "|", `Z=${ALU.Z}`);
-            print(MDR);
-            print(MAR);
-            print("== Program Memory")
-            print(PROG.toString(PROG_BEGIN));
-            print("== Data Memory");
-            print(DATA.toString(DATA_BEGIN));
-            print("\n");
-        }
-
-        // Run every instruction in the program.
-        // Print the CPU state after each step.
-        console.log("== Initial State");
+    // Run every instruction in the program.
+    // Print the CPU state after each step.
+    console.log("== Initial State");
+    printState();
+    const NUM_INSTRUCTIONS = program.length;
+    for (let i = 0; i < NUM_INSTRUCTIONS; i++) {
+        CPU.step();
+        console.log(`Step #${i + 1}`)
         printState();
-        const NUM_INSTRUCTIONS = program.length;
-        for (let i = 0; i < NUM_INSTRUCTIONS; i++) {
-            CPU.step();
-            console.log(`Step #${i + 1}`)
-            printState();
-        }
     }
 }
 
-PseudoCPU.main();
+main();
