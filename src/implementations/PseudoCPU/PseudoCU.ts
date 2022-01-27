@@ -25,6 +25,20 @@ export class PseudoCU implements ControlUnit {
         this._memory = memory;
     }
 
+    public clock() {
+        this.fetchAndDecodeNextInstruction();
+        this.executeInstruction();
+        // Clock all connected components
+        // after instruction execution.
+        this._ir.clock();
+        this._pc.clock();
+        this._ac.clock();
+        this._mar.clock();
+        this._mdr.clock();
+        // this._alu.clock();
+        this._memory.clock();
+    }
+
     // Performs instruction fetch and decode.
     public fetchAndDecodeNextInstruction() {
         // MAR <- PC

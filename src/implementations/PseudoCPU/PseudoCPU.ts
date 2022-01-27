@@ -136,7 +136,7 @@ export class PseudoCPU implements PseudoCPUArchitecture, CentralProcessingUnit {
         this.MDR = new Register("MDR", PseudoCPU.WORD_SIZE);
         this.MAR = new Register("MAR", PseudoCPU.ADDRESS_SIZE);
         this.ALU = new PseudoALU(this.AC, this.MDR, PseudoCPU.WORD_SIZE);
-        this.PROG = new Memory("PROG", PseudoCPU.PROGRAM_MEMORY_SIZE)
+        this.PROG = new Memory("PROG", PseudoCPU.PROGRAM_MEMORY_SIZE);
         this.DATA = new Memory("DATA", PseudoCPU.DATA_MEMORY_SIZE);
         this.M = new MemoryMap(this.MDR, this.MAR);
         this.M.mapExternalMemory(this.PROGRAM_MEMORY_BEGIN, PseudoCPU.PROGRAM_MEMORY_SIZE, MemoryAccess.READ, this.PROG);
@@ -144,11 +144,12 @@ export class PseudoCPU implements PseudoCPUArchitecture, CentralProcessingUnit {
         this.CU = new PseudoCU(this.IR, this.PC, this.AC, this.MAR, this.MDR, this.ALU, this.M);
     }
 
+    public stepClock() {
+        this.CU.clock();
+    }
+
     public stepInstruction() {
-        // == Fetch Cycle
-        this.CU.fetchAndDecodeNextInstruction();
-        // == Execute Cycle
-        this.CU.executeInstruction();
+        this.CU.clock();
     }
     
     public writeProgram(start: number, ...program: Array<number>) {

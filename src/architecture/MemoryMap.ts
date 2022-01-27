@@ -1,7 +1,7 @@
 import { Register } from "@/Register";
 import { Memory } from "@/Memory";
 
-type MemoryMapping = {
+export type MemoryMapping = {
     read: (address: number) => number,
     write: (address: number, value: number) => void
 }
@@ -14,7 +14,7 @@ export enum MemoryAccess {
 
 export class MemoryMap {
     // A map from address range [start, end] to a read/writable memory location.
-    private mappings: Map<[start: number, end: number], MemoryMapping>;
+    private mappings: Map<[start: number, end: number], MemoryMapping & { setEnable(): void, clearEnable(): void, clock: () => void }>;
     private _mdr: Register;
     private _mar: Register;
 
@@ -22,6 +22,12 @@ export class MemoryMap {
         this._mdr = mdr;
         this._mar = mar;
         this.mappings = new Map();
+    }
+
+    public clock() {
+        this.mappings.forEach(entry => {
+            entry?.clock();
+        })
     }
 
     private findAddressMapping(address: number) {
@@ -71,7 +77,8 @@ export class MemoryMap {
         }
         
         let range: [number, number] = [start, start + length - 1];
-        this.mappings.set(range, {read, write});
+        let { clock, setEnable, clearEnable } = M;
+        this.mappings.set(range, { read, write, clock, setEnable, clearEnable });
     }
 
     public mapRegister(a: number, R: Register) {
@@ -84,6 +91,7 @@ export class MemoryMap {
         }
         
         let range: [number, number] = [a, a];
-        this.mappings.set(range, {read, write});
+        let [ clock, setEnable, clearEnable ] = [ () => R.clock(), () => {}, () => {} ];
+        this.mappings.set(range, {read, write, clock, setEnable, clearEnable });
     }
 }
