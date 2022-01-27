@@ -1,5 +1,5 @@
-import { PseudoCPU } from "implementations/PseudoCPU/PseudoCPU";
-import { PseudoOpCode, LDA, STA, ADD, SHFT } from "implementations/PseudoCPU/PseudoInstruction";
+import { PseudoCPU } from "@/PseudoCPU/PseudoCPU";
+import { PseudoOpCode, LDA, STA, ADD, SHFT } from "@/PseudoCPU/PseudoInstruction";
 
 function main() {
     // Construct a ECE375 Pseudo CPU, factory new!
