@@ -1,5 +1,5 @@
 import { PseudoCPU } from "@/PseudoCPU/PseudoCPU";
-import { PseudoOpCode, LDA, STA, ADD, SHFT } from "@/PseudoCPU/PseudoInstruction";
+import { PseudoOpCode, LDA, STA, ADD, SHFT, PseudoInstruction } from "@/PseudoCPU/PseudoInstruction";
 
 function main() {
     // Construct a ECE375 Pseudo CPU, factory new!
@@ -16,7 +16,7 @@ function main() {
         SHFT(),
         ADD(B),
         STA(C)
-    ];
+    ].map(instruction => instruction.VALUE);
     // Write program to memory.
     CPU.writeProgram(0, ...program);
     // Initial values: A = 20, B = 20, C = 0.
