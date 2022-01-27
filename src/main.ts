@@ -18,7 +18,7 @@ function main() {
         STA(C)
     ];
     // Write program to memory.
-    CPU.writeProgram(0, program);
+    CPU.writeProgram(0, ...program);
     // Initial values: A = 20, B = 20, C = 0.
     CPU.writeData(A, 20);
     CPU.writeData(B, 21);

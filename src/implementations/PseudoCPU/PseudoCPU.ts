@@ -151,7 +151,7 @@ export class PseudoCPU implements PseudoCPUArchitecture, CentralProcessingUnit {
         this.CU.executeInstruction();
     }
     
-    public writeProgram(start: number, program: Array<Instruction>) {
+    public writeProgram(start: number, ...program: Array<Instruction>) {
         program.forEach((instruction, address) => {
             this.PROG.write(start + address - this.PROGRAM_MEMORY_BEGIN, instruction.VALUE);
         });
