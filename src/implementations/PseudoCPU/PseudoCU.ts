@@ -4,7 +4,7 @@ import { ControlUnit } from "@/ControlUnit";
 
 import { PseudoCPU } from "./PseudoCPU";
 import { PseudoOpCode } from "./PseudoInstruction";
-import {PseudoALU} from "./PseudoALU";
+import { PseudoALU } from "./PseudoALU";
 
 export class PseudoCU implements ControlUnit {
     private readonly _ir: Register;
@@ -25,28 +25,16 @@ export class PseudoCU implements ControlUnit {
         this._memory = memory;
     }
 
-    public clock() {
-        this.fetchAndDecodeNextInstruction();
-        this.executeInstruction();
-        // Clock all connected components
-        // after instruction execution.
-        this._ir.clock();
-        this._pc.clock();
-        this._ac.clock();
-        this._mar.clock();
-        this._mdr.clock();
-        // this._alu.clock();
-        this._memory.clock();
-    }
-
     // Performs instruction fetch and decode.
     public fetchAndDecodeNextInstruction() {
         // MAR <- PC
         this._mar.write(this._pc.read());
         // PC <- PC + 1
         this._pc.write(this._pc.read() + 1);
+
         // MDR <- M[MAR]
         this._memory.load();
+
         // IR <- MDR(opcode)
         let OPCODE_SHIFT = PseudoCPU.WORD_SIZE - PseudoCPU.OPCODE_SIZE;
         let opcode = this._mdr.read() >> OPCODE_SHIFT;
@@ -72,7 +60,7 @@ export class PseudoCU implements ControlUnit {
         const [IR, PC, AC, MAR, MDR, ALU, M] = [this._ir, this._pc, this._ac, this._mar, this._mdr, this._alu, this._memory];
 
         const copy = (dst: Register, src: Register) => dst.write(src.read());
-
+        
         let opcode = IR.read();
         switch (opcode) {
             case PseudoOpCode.LDA:      // LDA x:

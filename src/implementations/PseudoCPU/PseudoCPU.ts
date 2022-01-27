@@ -144,12 +144,9 @@ export class PseudoCPU implements PseudoCPUArchitecture, CentralProcessingUnit {
         this.CU = new PseudoCU(this.IR, this.PC, this.AC, this.MAR, this.MDR, this.ALU, this.M);
     }
 
-    public stepClock() {
-        this.CU.clock();
-    }
-
     public stepInstruction() {
-        this.CU.clock();
+        this.CU.fetchAndDecodeNextInstruction();
+        this.CU.executeInstruction();
     }
     
     public writeProgram(start: number, ...program: Array<number>) {
