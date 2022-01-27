@@ -4,42 +4,41 @@ const TsconfigPathsPlugin = require("tsconfig-paths-webpack-plugin");
 
 module.exports = {
     mode: "development",
-    // devtool: "inline-source-map",
+    devtool: "inline-source-map",
 
     module: {
         rules: [
             {
                 test: /\.ts$/,
                 include: [
-                    path.join(__dirname, "src"),
-                    // path.join(__dirname, "tests")
+                    path.join(__dirname, "src")
                 ],
-                use: [
-                    {
-                        loader: "ts-loader",
-                        options: {
-                            configFile: "tsconfig.json",
-                        }
-                    }
-                ]
+                loader: "ts-loader"
             },
+            {
+                test: /\.+$/,
+                include: [
+                    path.join(__dirname, "src")
+                ],
+                loader: "file-loader",
+                options: {
+                    name: "[name].[ext]"
+                }
+            }
         ]
     },
 
     entry: {
-        main: "./src/main.ts",
-        // tests: "./tests/tests.ts"
+        "main.js": "./src/main.ts"
     },
     
     output: {
-        filename: "[name].js",
+        filename: "[name]",
         path: __dirname + "/out"
     },
 
     resolve: {
         extensions: [".ts"],
-        plugins: [new TsconfigPathsPlugin({
-            configFile: "tsconfig.json"
-        })]
+        plugins: [new TsconfigPathsPlugin()]
     }
 };

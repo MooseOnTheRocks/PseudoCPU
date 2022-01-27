@@ -24,21 +24,19 @@ export enum PseudoOpCode {
     BNE  = 0b111
 }
 
+// Instruction memory format:
+//      [Instruction: WORD_SIZE] = [opcode: OPCODE_SIZE] [operand: ADDRESS_SIZE]
+// Operand usage is defined by the opcode.
+// Operand address is loaded into MAR after the fetch and decode cycle.
 export class PseudoInstruction implements Instruction {
     public readonly opcode: PseudoOpCode;
     public readonly operand: number;
+    public readonly VALUE: number;
 
     constructor(opcode: PseudoOpCode, operand: number) {
         this.opcode = opcode;
         this.operand = operand;
-    }
-
-    // Instruction memory format:
-    //      [Instruction: WORD_SIZE] = [opcode: OPCODE_SIZE] [operand: ADDRESS_SIZE]
-    // Operand usage is defined by the opcode.
-    // Operand address is loaded into MAR after the fetch and decode cycle.
-    public get VALUE(): number {
-        return (this.opcode << PseudoCPU.ADDRESS_SIZE) + this.operand;
+        this.VALUE = (this.opcode << PseudoCPU.ADDRESS_SIZE) + this.operand;
     }
 }
 
