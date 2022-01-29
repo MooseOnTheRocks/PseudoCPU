@@ -2,11 +2,12 @@ import {Register} from "@/Register";
 import { MemoryMap } from "@/MemoryMap";
 import { ControlUnit } from "@/ControlUnit";
 
-import { PseudoCPU } from "./PseudoCPU";
 import { PseudoOpCode } from "./PseudoInstruction";
 import { PseudoALU } from "./PseudoALU";
+import { PseudoCPUArchitecture } from "./PseudoCPUArchitecture";
 
 export class PseudoCU implements ControlUnit {
+    private readonly _architecture: PseudoCPUArchitecture;
     private readonly _ir: Register;
     private readonly _pc: Register;
     private readonly _ac: Register;
@@ -15,7 +16,8 @@ export class PseudoCU implements ControlUnit {
     private readonly _alu: PseudoALU;
     private readonly _memory: MemoryMap;
 
-    constructor(ir: Register, pc: Register, ac: Register, mar: Register, mdr: Register, alu: PseudoALU, memory: MemoryMap) {
+    constructor(architecture: PseudoCPUArchitecture, ir: Register, pc: Register, ac: Register, mar: Register, mdr: Register, alu: PseudoALU, memory: MemoryMap) {
+        this._architecture = architecture;
         this._ir = ir;
         this._pc = pc;
         this._ac = ac;
@@ -36,11 +38,11 @@ export class PseudoCU implements ControlUnit {
         this._mdr.write(this._memory.read(this._mar.read()));
 
         // IR <- MDR(opcode)
-        let OPCODE_SHIFT = PseudoCPU.WORD_SIZE - PseudoCPU.OPCODE_SIZE;
+        let OPCODE_SHIFT = this._architecture.WORD_SIZE - this._architecture.OPCODE_SIZE;
         let opcode = this._mdr.read() >> OPCODE_SHIFT;
         this._ir.write(opcode);
         // MAR <- MDR(address)
-        let ADDRESS_MASK = (1 << PseudoCPU.ADDRESS_SIZE) - 1;
+        let ADDRESS_MASK = (1 << this._architecture.ADDRESS_SIZE) - 1;
         let address = this._mdr.read() & ADDRESS_MASK;
         this._mar.write(address);
     }
@@ -98,14 +100,14 @@ export class PseudoCU implements ControlUnit {
                 break;
             case PseudoOpCode.J:        // J x:
                                         // PC <- MDR(address)
-                let ADDRESS_MASK = (1 << PseudoCPU.ADDRESS_SIZE) - 1;
+                let ADDRESS_MASK = (1 << this._architecture.ADDRESS_SIZE) - 1;
                 let address = MDR.read() & ADDRESS_MASK;
                 PC.write(address);
                 break;
             case PseudoOpCode.BNE:      // BNE x:
                                         // if (Z != 1) then PC <- MDR(address)
                 if (ALU.Z != 1) {
-                    let ADDRESS_MASK = (1 << PseudoCPU.ADDRESS_SIZE) - 1;
+                    let ADDRESS_MASK = (1 << this._architecture.ADDRESS_SIZE) - 1;
                     let address = MDR.read() & ADDRESS_MASK;
                     PC.write(address);
                 }

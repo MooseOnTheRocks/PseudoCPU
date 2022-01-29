@@ -9,8 +9,7 @@
 // BNE x: if (z != 1) then PC <- MAR(address)
 
 import { Instruction } from "@/Instruction";
-
-import { PseudoCPU } from "./PseudoCPU";
+import { PseudoCPUArchitecture } from "./PseudoCPUArchitecture";
 
 
 export enum PseudoOpCode {
@@ -33,18 +32,20 @@ export class PseudoInstruction implements Instruction {
     public readonly operand: number;
     public readonly VALUE: number;
 
-    constructor(opcode: PseudoOpCode, operand: number) {
+    constructor(offset: number, opcode: PseudoOpCode, operand: number) {
         this.opcode = opcode;
         this.operand = operand;
-        this.VALUE = (this.opcode << PseudoCPU.ADDRESS_SIZE) + this.operand;
+        this.VALUE = (this.opcode << offset) + this.operand;
     }
 }
 
-export const LDA    = (operand: number) => new PseudoInstruction(PseudoOpCode.LDA, operand);
-export const STA    = (operand: number) => new PseudoInstruction(PseudoOpCode.STA, operand);
-export const ADD    = (operand: number) => new PseudoInstruction(PseudoOpCode.ADD, operand);
-export const SUB    = (operand: number) => new PseudoInstruction(PseudoOpCode.SUB, operand);
-export const NAND   = (operand: number) => new PseudoInstruction(PseudoOpCode.NAND, operand);
-export const SHFT   = ()                => new PseudoInstruction(PseudoOpCode.SHFT, 0);
-export const J      = (operand: number) => new PseudoInstruction(PseudoOpCode.J,   operand);
-export const BNE    = (operand: number) => new PseudoInstruction(PseudoOpCode.BNE, operand);
+export const instructionBuilder = ({ADDRESS_SIZE}: PseudoCPUArchitecture) => ({
+    LDA:    (operand: number) => new PseudoInstruction(ADDRESS_SIZE, PseudoOpCode.LDA, operand),
+    STA:    (operand: number) => new PseudoInstruction(ADDRESS_SIZE, PseudoOpCode.STA, operand),
+    ADD:    (operand: number) => new PseudoInstruction(ADDRESS_SIZE, PseudoOpCode.ADD, operand),
+    SUB:    (operand: number) => new PseudoInstruction(ADDRESS_SIZE, PseudoOpCode.SUB, operand),
+    NAND:   (operand: number) => new PseudoInstruction(ADDRESS_SIZE, PseudoOpCode.NAND, operand),
+    SHFT:   ()                => new PseudoInstruction(ADDRESS_SIZE, PseudoOpCode.SHFT, 0),
+    J:      (operand: number) => new PseudoInstruction(ADDRESS_SIZE, PseudoOpCode.J,   operand),
+    BNE:    (operand: number) => new PseudoInstruction(ADDRESS_SIZE, PseudoOpCode.BNE, operand),
+});

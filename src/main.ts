@@ -1,9 +1,11 @@
-import { PseudoCPU } from "@/PseudoCPU/PseudoCPU";
-import { PseudoOpCode, LDA, STA, ADD, SHFT, PseudoInstruction } from "@/PseudoCPU/PseudoInstruction";
+import { PseudoCPUBasic } from "@/PseudoCPU/Basic/PseudoCPUBasic";
+import { PseudoOpCode, instructionBuilder } from "@/PseudoCPU/PseudoInstruction";
 
 function main() {
     // Construct a ECE375 Pseudo CPU, factory new!
-    const CPU = new PseudoCPU();
+    const CPU = new PseudoCPUBasic();
+    // Create instruction bit representation based on CPU opcode and address size.
+    const { LDA, STA, ADD, SHFT } = instructionBuilder(CPU);
 
     // Define labels in DATA memory.
     let A = CPU.DATA_MEMORY_BEGIN;
