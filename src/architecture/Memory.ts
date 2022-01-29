@@ -1,4 +1,6 @@
-export class Memory {
+import { MemoryMapping } from "./MemoryMap";
+
+export class Memory implements MemoryMapping {
     public readonly NAME: string;
     public readonly SIZE: number;
     private _data: Array<number>;
@@ -11,10 +13,12 @@ export class Memory {
     }
 
     public write(address: number, data: number) {
+        console.log(`${this.NAME}.write(${address}, ${data})`);
         this._data[address] = data;
     }
 
     public read(address: number): number {
+        console.log(`${this.NAME}.read(${address})`);
         return this._data[address];
     }
 

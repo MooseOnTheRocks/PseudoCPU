@@ -138,9 +138,9 @@ export class PseudoCPU implements PseudoCPUArchitecture, CentralProcessingUnit {
         this.ALU = new PseudoALU(this.AC, this.MDR, PseudoCPU.WORD_SIZE);
         this.PROG = new Memory("PROG", PseudoCPU.PROGRAM_MEMORY_SIZE);
         this.DATA = new Memory("DATA", PseudoCPU.DATA_MEMORY_SIZE);
-        this.M = new MemoryMap(this.MDR, this.MAR);
-        this.M.mapExternalMemory(this.PROGRAM_MEMORY_BEGIN, PseudoCPU.PROGRAM_MEMORY_SIZE, MemoryAccess.READ, this.PROG);
-        this.M.mapExternalMemory(this.DATA_MEMORY_BEGIN, PseudoCPU.DATA_MEMORY_SIZE, MemoryAccess.READ_WRITE, this.DATA);
+        this.M = new MemoryMap();
+        this.M.mapMemoryRange(this.PROGRAM_MEMORY_BEGIN, PseudoCPU.PROGRAM_MEMORY_SIZE, MemoryAccess.READ, this.PROG);
+        this.M.mapMemoryRange(this.DATA_MEMORY_BEGIN, PseudoCPU.DATA_MEMORY_SIZE, MemoryAccess.READ_WRITE, this.DATA);
         this.CU = new PseudoCU(this.IR, this.PC, this.AC, this.MAR, this.MDR, this.ALU, this.M);
     }
 

@@ -33,7 +33,7 @@ export class PseudoCU implements ControlUnit {
         this._pc.write(this._pc.read() + 1);
 
         // MDR <- M[MAR]
-        this._memory.load();
+        this._mdr.write(this._memory.read(this._mar.read()));
 
         // IR <- MDR(opcode)
         let OPCODE_SHIFT = PseudoCPU.WORD_SIZE - PseudoCPU.OPCODE_SIZE;
@@ -59,28 +59,38 @@ export class PseudoCU implements ControlUnit {
 
         const [IR, PC, AC, MAR, MDR, ALU, M] = [this._ir, this._pc, this._ac, this._mar, this._mdr, this._alu, this._memory];
 
-        const copy = (dst: Register, src: Register) => dst.write(src.read());
+        function copy(dst: Register, src: Register) {
+            dst.write(src.read());
+        }
+
+        function load() {
+            MDR.write(M.read(MAR.read()));
+        }
+
+        function store() {
+            M.write(MAR.read(), MDR.read());
+        }
         
         let opcode = IR.read();
         switch (opcode) {
             case PseudoOpCode.LDA:      // LDA x:
-                M.load();               // MDR <- M[MAR]
+                load();                 // MDR <- M[MAR]
                 copy(AC, MDR);          // AC <- MDR
                 break;
             case PseudoOpCode.STA:      // STA x:
                 copy(MDR, AC);          // MDR <- AC
-                M.store();              // M[MAR] <- MDR
+                store();                // M[MAR] <- MDR
                 break;
             case PseudoOpCode.ADD:      // ADD x:
-                M.load();               // MDR <- M[MAR]
+                load();                 // MDR <- M[MAR]
                 ALU.add();              // AC <- AC + MDR
                 break;
             case PseudoOpCode.SUB:      // SUB x:
-                M.load();               // MDR <- M[MAR]
+                load();                 // MDR <- M[MAR]
                 ALU.sub();              // AC <- AC - MDR
                 break;
             case PseudoOpCode.NAND:     // NAND x:
-                M.load();               // MDR <- M[MAR]
+                load();                 // MDR <- M[MAR]
                 ALU.nand();             // AC <- ~(AC & MDR)
                 break;
             case PseudoOpCode.SHFT:     // SHFT:

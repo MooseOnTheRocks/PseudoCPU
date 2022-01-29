@@ -15,12 +15,8 @@ export enum MemoryAccess {
 export class MemoryMap {
     // A map from address range [start, end] to a read/writable memory location.
     private mappings: Map<[start: number, end: number], MemoryMapping>;
-    private _mdr: Register;
-    private _mar: Register;
 
-    constructor(mdr: Register, mar: Register) {
-        this._mdr = mdr;
-        this._mar = mar;
+    constructor() {
         this.mappings = new Map();
     }
 
@@ -31,59 +27,43 @@ export class MemoryMap {
         return mapping;
     }
 
-    public load() {
-        let address = this._mar.read();
+    public read(address: number): number {
         let mapping = this.findAddressMapping(address);
         if (mapping === undefined) {
             throw "Attempting to load() from unmapped memory";
         }
         else {
             let data = mapping.read(address);
-            this._mdr.write(data);
+            return data;
         }
     }
 
-    public store() {
-        let address = this._mar.read();
+    public write(address: number, data: number) {
         let mapping = this.findAddressMapping(address);
         if (mapping === undefined) {
             throw "Attempting to store() to unmapped memory";
         }
         else {
-            let data = this._mdr.read();
             mapping.write(address, data);
         }
     }
 
-    public mapExternalMemory(start: number, length: number, mode: MemoryAccess, M: Memory) {
-        function read(address: number): number {
+    public mapMemoryRange(start: number, length: number, mode: MemoryAccess, MM: MemoryMapping) {
+        function read_(address: number): number {
             if (mode === MemoryAccess.WRITE) {
                 throw "Attempting to read() from WRITE-only memory"
             }
-            return M.read(address - start);
+            return MM.read(address - start);
         }
 
-        function write(address: number, value: number) {
+        function write_(address: number, value: number) {
             if (mode === MemoryAccess.READ) {
                 throw "Attempting to write() to READ-only memory"
             }
-            M.write(address - start, value);
+            MM.write(address - start, value);
         }
-        
+
         let range: [number, number] = [start, start + length - 1];
-        this.mappings.set(range, { read, write });
-    }
-
-    public mapRegister(a: number, R: Register) {
-        function read(address: number): number {
-            return R.read();
-        }
-
-        function write(address: number, value: number) {
-            R.write(value);
-        }
-        
-        let range: [number, number] = [a, a];
-        this.mappings.set(range, { read, write });
+        this.mappings.set(range, { read: read_, write: write_ })
     }
 }
