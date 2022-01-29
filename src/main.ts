@@ -1,27 +1,16 @@
 import { PseudoCPUBasic } from "@/PseudoCPU/Basic/PseudoCPUBasic";
-import { PseudoOpCode, instructionBuilder } from "@/PseudoCPU/PseudoInstruction";
+import { PseudoOpCode } from "@/PseudoCPU/PseudoInstruction";
+
+import programBuilder from "@/PseudoCPU/programs/mul_4_A__add_B";
 
 function main() {
     // Construct a ECE375 Pseudo CPU, factory new!
     const CPU = new PseudoCPUBasic();
-    // Create instruction bit representation based on CPU opcode and address size.
-    const { LDA, STA, ADD, SHFT } = instructionBuilder(CPU);
-
-    // Define labels in DATA memory.
-    let A = CPU.DATA_MEMORY_BEGIN;
-    let B = CPU.DATA_MEMORY_BEGIN + 1;
-    let C = CPU.DATA_MEMORY_BEGIN + 2;
-    // Program, computes C = 4*A + B
-    const program = [
-        LDA(A),
-        SHFT(),
-        SHFT(),
-        ADD(B),
-        STA(C)
-    ].map(instruction => instruction.VALUE);
+    let { labels, program }  = programBuilder(CPU);
+    const { A, B } = labels;
     // Write program to memory.
     CPU.writeProgram(0, ...program);
-    // Initial values: A = 20, B = 20, C = 0.
+    // Write initial values to data memory: A = 20, B = 20.
     CPU.writeData(A, 20);
     CPU.writeData(B, 21);
 
